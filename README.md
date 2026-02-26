@@ -41,8 +41,7 @@ Do not put passwords or access tokens in project files.
 
 - [index.html](./index.html): vertical game layout and overlays.
 - [styles.css](./styles.css): mobile-first styling, responsive rules, animation hooks.
-- [game.js](./game.js): full game engine, state machine, timers, and bot AI.
-- [supabase-client.js](./supabase-client.js): Supabase client and connection test helper.
+- [game.js](./game.js): app flow, game engine, bot AI, and Supabase realtime friend networking.
 - [supabase-config.example.js](./supabase-config.example.js): safe config template.
 - `supabase-config.js`: local config (ignored by git).
 - `assets/`: root folder for future visual assets.
@@ -55,20 +54,7 @@ Do not put passwords or access tokens in project files.
 
 If an image is missing, UI falls back to styled placeholders.
 
-## State Machine
+## Modes
 
-The game loop is explicit and phase-based:
-
-- `playerTurn`
-- `awaitingResponse`
-- `resolving`
-- `roundEnd`
-- `matchEnd`
-
-## DEV Testing
-
-Inside [game.js](./game.js), edit the `DEV` object:
-
-- `enabled: true`
-- `forceRoles.human` / `forceRoles.bot`
-- `forceStartingActor: "human"` or `"bot"`
+- `Play vs Bot`: local human vs bot.
+- `Play vs a Friend`: Supabase Realtime room (`presence` + `broadcast`), no database writes.

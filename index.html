@@ -2,106 +2,170 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CLAIM DUEL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Liar's Clash</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <section id="menuScreen" class="menu-screen">
-    <div class="menu-card">
-      <h1>CLAIM DUEL</h1>
-      <p id="menuLevelText" class="menu-level">Level 1</p>
-      <button id="startMatchBtn" type="button">Start Match</button>
-    </div>
-  </section>
+  <div id="appRoot" class="app-root">
+    <section id="homeScreen" class="screen active" aria-label="Home">
+      <div class="screen-card home-card">
+        <p class="level-pill">Level 1</p>
+        <h1 class="app-title">Liar's Clash</h1>
 
-  <main id="gameScreen" class="app-shell hidden" aria-label="Claim Duel Match">
-    <section class="panel round-header">
-      <button id="rulesBtn" class="round-help-btn" type="button" aria-label="Open quick rules">?</button>
-      <h1 id="roundLabel" class="round-label">ROUND 1/10</h1>
-      <p id="timerText" class="timer-overlay" aria-live="polite">--</p>
-      <p id="turnIndicator" class="turn-indicator">Your turn</p>
-      <p id="smallLevelText" class="small-level">Lv.1</p>
-    </section>
+        <button id="avatarPreviewBtn" class="avatar-preview" type="button" aria-label="Choose avatar">
+          <span id="avatarPreviewArt" class="avatar-art avatar-1"></span>
+          <span id="avatarPreviewLabel" class="avatar-preview-label">Avatar 1</span>
+        </button>
 
-    <section id="botPanel" class="panel player-panel">
-      <h2 class="panel-title">BOT</h2>
-      <div id="botCards" class="bot-cards" aria-label="Bot role cards"></div>
+        <label class="field-label" for="playerNameInput">Player Name</label>
+        <input id="playerNameInput" class="text-input" type="text" maxlength="18" value="Player" autocomplete="off" />
 
-      <div class="figure-slot">
-        <img id="botFigureImg" src="assets/figures/bot.png" alt="Bot figure" />
-        <div id="botFigureFallback" class="figure-fallback">[Bot Figure PNG]<br />(placeholder)</div>
-      </div>
-
-      <div class="stats-row">
-        <p id="botHpText" class="stat-line">❤️ HP: 5</p>
-        <p id="botGoldText" class="stat-line">🪙 Gold: 2</p>
+        <button id="homePlayBtn" class="btn btn-primary btn-play-pulse" type="button">PLAY</button>
       </div>
     </section>
 
-    <section class="panel current-action-panel">
-      <h2 class="panel-title action-title">CURRENT ACTION</h2>
-      <p id="currentActionText" class="current-action-text">Ready.</p>
-    </section>
-
-    <section id="humanPanel" class="panel player-panel">
-      <h2 class="panel-title">HUMAN</h2>
-
-      <div class="figure-slot human-figure">
-        <img id="humanFigureImg" src="assets/figures/human.png" alt="Human figure" />
-        <div id="humanFigureFallback" class="figure-fallback">[Your Figure PNG]<br />(placeholder)</div>
+    <section id="modeScreen" class="screen" aria-label="Mode Select">
+      <div class="top-row">
+        <button id="modeBackBtn" class="btn btn-back" type="button">Back to Menu</button>
       </div>
-
-      <div class="stats-row">
-        <p id="humanHpText" class="stat-line">❤️ HP: 5</p>
-        <p id="humanGoldText" class="stat-line">🪙 Gold: 2</p>
+      <div class="screen-card mode-card">
+        <h2 class="section-title">Choose Mode</h2>
+        <button id="playBotBtn" class="btn mode-btn" type="button">Play vs Bot</button>
+        <button id="playFriendBtn" class="btn mode-btn" type="button">Play vs a Friend</button>
       </div>
     </section>
 
-    <section class="basic-actions" aria-label="Basic actions">
-      <button id="interestBtn" class="basic-btn" type="button">
-        INTEREST
-        <span class="basic-desc">+1 🪙</span>
-      </button>
-      <button id="strikeBtn" class="basic-btn strike-btn" type="button">
-        STRIKE
-        <span class="basic-desc">Deal 1 ⚔️</span>
-        <span class="basic-cost-badge">2</span>
-      </button>
-    </section>
+    <section id="friendScreen" class="screen" aria-label="Friend Setup">
+      <div class="top-row">
+        <button id="friendBackBtn" class="btn btn-back" type="button">Back to Menu</button>
+      </div>
+      <div class="screen-card friend-card">
+        <h2 class="section-title">Play with a Friend</h2>
+        <p class="helper-text">Create a room link and share it. Your friend auto-joins from the link.</p>
+        <button id="createLinkBtn" class="btn mode-btn" type="button">Create link</button>
 
-    <section id="humanCards" class="human-cards" aria-label="Your role cards"></section>
-    <p class="cards-note">First 2 cards are real roles. Last 2 are fake roles.</p>
-  </main>
-
-  <section
-    id="responseOverlay"
-    class="response-overlay hidden"
-    role="dialog"
-    aria-modal="true"
-    aria-label="Respond to claim"
-  >
-    <button id="acceptBtn" class="response-btn" type="button" data-response="ACCEPT">ACCEPT</button>
-    <button id="challengeBtn" class="response-btn" type="button" data-response="CHALLENGE">CHALLENGE</button>
-  </section>
-
-  <section id="resultScreen" class="result-screen hidden" role="dialog" aria-modal="true" aria-label="Match result">
-    <div class="result-card">
-      <h2 id="resultWinnerText">YOU WIN</h2>
-      <p id="resultSummaryText">Result summary</p>
-      <p id="resultStatsText">Human: 0 HP, 0 Gold | Bot: 0 HP, 0 Gold</p>
-
-      <div class="xp-panel">
-        <p id="resultLevelText">Level 1</p>
-        <p id="resultXpText">0 / 100 XP</p>
-        <div class="xp-bar">
-          <div id="resultXpFill" class="xp-fill"></div>
+        <div id="friendLinkBlock" class="friend-link-block hidden">
+          <label class="field-label" for="friendLinkInput">Guest link</label>
+          <input id="friendLinkInput" class="text-input" type="text" readonly />
+          <button id="copyFriendLinkBtn" class="btn" type="button">Copy</button>
+          <p id="copyStatusText" class="helper-text"></p>
         </div>
       </div>
+    </section>
 
-      <div class="result-actions">
-        <button id="playAgainBtn" type="button">Play Again</button>
-        <button id="backToMenuBtn" type="button">Back to Menu</button>
+    <section id="waitingScreen" class="screen" aria-label="Waiting Room">
+      <div class="top-row">
+        <button id="waitingBackBtn" class="btn btn-back" type="button">Back to Menu</button>
+      </div>
+      <div class="screen-card waiting-card">
+        <h2 class="section-title">Waiting for friend...</h2>
+        <p id="waitingStatusText" class="helper-text">Connected: 1/2</p>
+        <p id="waitingRoleText" class="helper-text">You are Host</p>
+        <p id="waitingRoomText" class="helper-text">Room: ----</p>
+        <div id="waitingLinkBlock" class="friend-link-block hidden">
+          <input id="waitingLinkInput" class="text-input" type="text" readonly />
+          <button id="waitingCopyBtn" class="btn" type="button">Copy link</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="screen" aria-label="Liar's Clash Match">
+      <div class="top-row">
+        <button id="gameBackBtn" class="btn btn-back" type="button">Back to Menu</button>
+        <button id="rulesBtn" class="btn btn-secondary" type="button" aria-label="Open quick rules">Rules</button>
+      </div>
+
+      <p id="friendBanner" class="friend-banner hidden">Connected: 1/2 | You are Host | Room: ----</p>
+
+      <main id="gameViewport" class="game-viewport">
+        <section class="panel round-panel">
+          <h2 id="roundLabel" class="round-label">ROUND 1/10</h2>
+          <p id="timerText" class="timer-text">--</p>
+          <p id="turnIndicator" class="turn-indicator">Your turn</p>
+        </section>
+
+        <section id="topPanel" class="panel player-panel">
+          <div class="player-head">
+            <span id="topAvatar" class="avatar-art avatar-bot player-avatar"></span>
+            <div>
+              <h3 id="topNameText" class="player-name">Opponent</h3>
+              <p id="topStatsText" class="player-stats">HP: 5 | Gold: 2</p>
+            </div>
+          </div>
+          <div id="topCards" class="card-grid" aria-label="Opponent role cards"></div>
+        </section>
+
+        <section class="panel current-action-panel">
+          <h3 class="panel-subtitle">Current Action</h3>
+          <p id="currentActionText" class="current-action-text">Ready.</p>
+        </section>
+
+        <section id="bottomPanel" class="panel player-panel">
+          <div class="player-head">
+            <span id="bottomAvatar" class="avatar-art avatar-1 player-avatar"></span>
+            <div>
+              <h3 id="bottomNameText" class="player-name">You</h3>
+              <p id="bottomStatsText" class="player-stats">HP: 5 | Gold: 2</p>
+            </div>
+          </div>
+          <div id="bottomCards" class="card-grid" aria-label="Your role cards"></div>
+        </section>
+
+        <section class="basic-actions" aria-label="Basic actions">
+          <button id="interestBtn" class="btn action-btn" type="button">
+            INTEREST
+            <span class="action-desc">+1 Gold</span>
+          </button>
+          <button id="strikeBtn" class="btn action-btn" type="button">
+            STRIKE
+            <span class="action-desc">Deal 1 DMG</span>
+            <span class="cost-pill">2</span>
+          </button>
+        </section>
+
+        <p class="cards-note">Real and fake roles are assigned each match. Bluff carefully.</p>
+      </main>
+    </section>
+
+    <section id="resultScreen" class="screen" aria-label="Match Result">
+      <div class="top-row">
+        <button id="resultBackBtn" class="btn btn-back" type="button">Back to Menu</button>
+      </div>
+      <div class="screen-card result-card">
+        <h2 id="resultWinnerText" class="section-title">YOU WIN</h2>
+        <p id="resultSummaryText" class="helper-text">Result summary</p>
+        <p id="resultStatsText" class="helper-text">Player: 0 HP, 0 Gold | Opponent: 0 HP, 0 Gold</p>
+        <div class="result-actions">
+          <button id="playAgainBtn" class="btn mode-btn" type="button">Play Again</button>
+          <button id="backToMenuBtn" class="btn" type="button">Back to Menu</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section id="responseOverlay" class="response-overlay hidden" role="dialog" aria-modal="true" aria-label="Respond to claim">
+    <button id="acceptBtn" class="response-btn" type="button">ACCEPT</button>
+    <button id="challengeBtn" class="response-btn" type="button">CHALLENGE</button>
+  </section>
+
+  <section id="avatarModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Select avatar">
+    <div class="modal-card">
+      <button id="avatarModalCloseBtn" class="modal-close-btn" type="button" aria-label="Close avatar selector">X</button>
+      <h2 class="section-title">Choose Avatar</h2>
+      <div class="avatar-grid">
+        <button class="avatar-choice" type="button" data-avatar-id="avatar-1">
+          <span class="avatar-art avatar-1"></span>
+          <span>Avatar 1</span>
+        </button>
+        <button class="avatar-choice" type="button" data-avatar-id="avatar-2">
+          <span class="avatar-art avatar-2"></span>
+          <span>Avatar 2</span>
+        </button>
+        <button class="avatar-choice" type="button" data-avatar-id="avatar-3">
+          <span class="avatar-art avatar-3"></span>
+          <span>Avatar 3</span>
+        </button>
       </div>
     </div>
   </section>
@@ -109,7 +173,7 @@
   <section id="rulesModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Quick rules">
     <div class="modal-card">
       <button id="rulesCloseBtn" class="modal-close-btn" type="button" aria-label="Close quick rules">X</button>
-      <pre class="rules-text">=== CLAIM DUEL - QUICK RULES ===
+      <pre class="rules-text">=== LIAR'S CLASH - QUICK RULES ===
 
 Goal:
 Reduce opponent HP to 0.
@@ -136,6 +200,7 @@ DWARF -> shield next damage (1 Gold)
 KNIGHT -> 2 damage (2 Gold)
 GOBLIN -> steal 1 Gold (max 3 uses)
 ENT -> heal 2 HP (2 Gold)
+PIRATE -> 1 damage +1 Gold (max 2 uses)
 ELF -> passive bonus
 
 Basic:
@@ -147,7 +212,6 @@ STRIKE -> 1 damage (2 Gold)
   </section>
 
   <script src="supabase-config.js"></script>
-  <script type="module" src="supabase-client.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
