@@ -46,10 +46,16 @@
         <button id="createLinkBtn" class="btn mode-btn" type="button">Create link</button>
 
         <div id="friendLinkBlock" class="friend-link-block hidden">
+          <label class="field-label" for="hostLinkInput">Host link</label>
+          <input id="hostLinkInput" class="text-input" type="text" readonly />
           <label class="field-label" for="friendLinkInput">Guest link</label>
-          <input id="friendLinkInput" class="text-input" type="text" readonly />
-          <button id="copyFriendLinkBtn" class="btn" type="button">Copy</button>
-          <p id="copyStatusText" class="helper-text"></p>
+          <div class="link-copy-row">
+            <input id="friendLinkInput" class="text-input" type="text" readonly />
+            <button id="copyFriendLinkBtn" class="btn btn-copy" type="button">Copy link</button>
+          </div>
+          <p id="friendConnectionStatusText" class="helper-text">Status: Idle</p>
+          <p id="friendConnectionErrorText" class="helper-text error-text hidden"></p>
+          <button id="friendReconnectBtn" class="btn hidden" type="button">Reconnect</button>
         </div>
       </div>
     </section>
@@ -63,10 +69,18 @@
         <p id="waitingStatusText" class="helper-text">Connected: 1/2</p>
         <p id="waitingRoleText" class="helper-text">You are Host</p>
         <p id="waitingRoomText" class="helper-text">Room: ----</p>
+        <p id="waitingConnectionStatusText" class="helper-text">Status: Connecting...</p>
+        <p id="waitingConnectionErrorText" class="helper-text error-text hidden"></p>
         <div id="waitingLinkBlock" class="friend-link-block hidden">
-          <input id="waitingLinkInput" class="text-input" type="text" readonly />
-          <button id="waitingCopyBtn" class="btn" type="button">Copy link</button>
+          <label class="field-label" for="waitingHostLinkInput">Host link</label>
+          <input id="waitingHostLinkInput" class="text-input" type="text" readonly />
+          <label class="field-label" for="waitingGuestLinkInput">Guest link</label>
+          <div class="link-copy-row">
+            <input id="waitingGuestLinkInput" class="text-input" type="text" readonly />
+            <button id="waitingCopyBtn" class="btn btn-copy" type="button">Copy link</button>
+          </div>
         </div>
+        <button id="waitingReconnectBtn" class="btn hidden" type="button">Reconnect</button>
       </div>
     </section>
 
@@ -148,6 +162,7 @@
     <button id="acceptBtn" class="response-btn" type="button">ACCEPT</button>
     <button id="challengeBtn" class="response-btn" type="button">CHALLENGE</button>
   </section>
+  <p id="copyToast" class="copy-toast hidden" role="status" aria-live="polite">Copied!</p>
 
   <section id="avatarModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Select avatar">
     <div class="modal-card">
@@ -211,7 +226,7 @@ STRIKE -> 1 damage (2 Gold)
     </div>
   </section>
 
-  <script src="supabase-config.js"></script>
+  <script src="supabase-public-config.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

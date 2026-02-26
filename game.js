@@ -64,9 +64,13 @@ const state = {
   friend: {
     roomId: "",
     role: null,
-    link: "",
+    hostLink: "",
+    guestLink: "",
     startInFlight: false,
-    pendingRequest: null
+    pendingRequest: null,
+    connectionStatus: "Idle",
+    errorMessage: "",
+    copyToastTimerId: null
   },
   localSlot: "human",
   slots: {
@@ -117,7 +121,9 @@ const net = {
     const supabaseUrl = typeof rawConfig.url === "string" ? rawConfig.url.trim() : "";
     const supabaseAnonKey = typeof rawConfig.anonKey === "string" ? rawConfig.anonKey.trim() : "";
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error("[Supabase] Missing URL or anon key in supabase-config.js.");
+      console.error("[Supabase] Missing URL or anon key in runtime config.");
+      setFriendStatus("Config missing");
+      setFriendError("Supabase config is missing in production build.");
       return false;
     }
     try {
@@ -125,17 +131,23 @@ const net = {
       this.client = supa.createClient(supabaseUrl, supabaseAnonKey);
       this.supabaseReady = true;
       window.liarsClashSupabase = this.client;
-      console.log("[Supabase] Client initialized.");
+      console.log("[Supabase] Client initialized:", supabaseUrl);
       return true;
     } catch (error) {
       console.error("[Supabase] Failed to initialize:", error);
+      setFriendStatus("Init failed");
+      setFriendError("Could not initialize Supabase client.");
       return false;
     }
   },
 
   async joinRoom(roomId, role) {
+    console.log(`[Supabase] joinRoom requested: room=${roomId} role=${role}`);
     const ok = await this.initSupabase();
-    if (!ok) return false;
+    if (!ok) {
+      setFriendStatus("Connection failed");
+      return false;
+    }
     await this.leaveRoom();
 
     this.roomId = roomId;
@@ -147,20 +159,26 @@ const net = {
     this.lastSeq = 0;
     this.pendingCanonical.clear();
     this.requestCache.clear();
+    setFriendError("");
+    setFriendStatus("Subscribing...");
 
     const channel = this.client.channel(`room:${roomId}`, {
       config: { broadcast: { self: true }, presence: { key: this.playerId } }
     });
+    console.log(`[Supabase] Subscribing to channel room:${roomId}`);
 
     channel.on("presence", { event: "sync" }, () => {
+      console.log("[Supabase] presence sync event");
       this.handlePresenceSync();
     });
 
     channel.on("presence", { event: "join" }, () => {
+      console.log("[Supabase] presence join event");
       this.handlePresenceSync();
     });
 
     channel.on("presence", { event: "leave" }, () => {
+      console.log("[Supabase] presence leave event");
       this.handlePresenceSync();
     });
 
@@ -172,29 +190,90 @@ const net = {
 
     this.channel = channel;
 
-    channel.subscribe(async (status) => {
-      if (status === "SUBSCRIBED") {
-        try {
-          await channel.track({
-            name: safePlayerName(state.profile.name),
-            avatarId: normalizeAvatarId(state.profile.avatarId),
-            role: this.role
-          });
-        } catch (error) {
-          console.error("[Supabase] Presence track failed:", error);
+    const joined = await new Promise((resolve) => {
+      let settled = false;
+      const settle = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+
+      const timeoutId = setTimeout(() => {
+        setFriendStatus("Subscribe timeout");
+        setFriendError("Timed out joining room. Try Reconnect.");
+        settle(false);
+      }, 10000);
+
+      channel.subscribe(async (status) => {
+        console.log(`[Supabase] subscribe status: ${status}`);
+        if (status === "SUBSCRIBED") {
+          setFriendStatus("Subscribed");
+          try {
+            setFriendStatus("Tracking presence...");
+            console.log("[Supabase] track called");
+            await channel.track({
+              playerId: this.playerId,
+              name: safePlayerName(state.profile.name),
+              avatarId: normalizeAvatarId(state.profile.avatarId),
+              role: this.role
+            });
+            this.presenceById[this.playerId] = {
+              name: safePlayerName(state.profile.name),
+              avatarId: normalizeAvatarId(state.profile.avatarId),
+              role: this.role
+            };
+            this.connectedCount = Math.max(1, Object.keys(this.presenceById).length);
+            updateUI();
+            this.handlePresenceSync();
+          } catch (error) {
+            console.error("[Supabase] Presence track failed:", error);
+            setFriendStatus("Track failed");
+            setFriendError("Presence tracking failed. Try Reconnect.");
+            clearTimeout(timeoutId);
+            settle(false);
+            return;
+          }
+          await this.sendEvent(
+            "HELLO",
+            {
+              joined: true,
+              role: this.role,
+              name: safePlayerName(state.profile.name),
+              avatarId: normalizeAvatarId(state.profile.avatarId)
+            },
+            { actorId: this.playerId }
+          );
+          clearTimeout(timeoutId);
+          settle(true);
+          return;
         }
-        await this.sendEvent(
-          "HELLO",
-          {
-            joined: true,
-            role: this.role,
-            name: safePlayerName(state.profile.name),
-            avatarId: normalizeAvatarId(state.profile.avatarId)
-          },
-          { actorId: this.playerId }
-        );
-      }
+
+        if (status === "CHANNEL_ERROR") {
+          setFriendStatus("Channel error");
+          setFriendError("Realtime channel error. Check Supabase Realtime and try Reconnect.");
+          clearTimeout(timeoutId);
+          settle(false);
+          return;
+        }
+
+        if (status === "TIMED_OUT") {
+          setFriendStatus("Subscribe timeout");
+          setFriendError("Room subscription timed out. Try Reconnect.");
+          clearTimeout(timeoutId);
+          settle(false);
+          return;
+        }
+
+        if (status === "CLOSED") {
+          setFriendStatus("Disconnected");
+        }
+      });
     });
+
+    if (!joined) {
+      await this.leaveRoom();
+      return false;
+    }
 
     return true;
   },
@@ -210,6 +289,7 @@ const net = {
       this.requestCache.clear();
       this.seq = 0;
       this.lastSeq = 0;
+      setFriendStatus("Disconnected");
       return;
     }
     try {
@@ -228,6 +308,7 @@ const net = {
     this.seq = 0;
     this.lastSeq = 0;
     clearSyncTimer();
+    setFriendStatus("Disconnected");
   },
 
   handlePresenceSync() {
@@ -246,8 +327,10 @@ const net = {
     });
 
     this.connectedCount = Object.keys(this.presenceById).length;
+    console.log("[Supabase] presence state:", this.presenceById);
     const hostEntry = Object.entries(this.presenceById).find(([, payload]) => payload.role === "host");
     if (hostEntry) this.hostId = hostEntry[0];
+    setFriendStatus(`Connected ${this.connectedCount}/2`);
 
     updateUI();
 
@@ -482,11 +565,43 @@ function getRoomIdFromUrl() {
   return room ? room.replace(/[^a-z0-9-]/g, "").slice(0, 24) : "";
 }
 
-function setRoomIdInUrl(roomId) {
+function getRoomRoleFromUrl() {
+  const query = new URLSearchParams(window.location.search);
+  const role = (query.get("role") || "").trim().toLowerCase();
+  return role === "guest" ? "guest" : "host";
+}
+
+function setRoomIdInUrl(roomId, role = null) {
   const url = new URL(window.location.href);
   if (roomId) url.searchParams.set("room", roomId);
   else url.searchParams.delete("room");
+  if (!roomId || role !== "guest") url.searchParams.delete("role");
+  else url.searchParams.set("role", "guest");
   window.history.replaceState({}, "", url.toString());
+}
+
+function createHostLink(roomId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("room", roomId);
+  url.searchParams.delete("role");
+  return url.toString();
+}
+
+function createGuestLink(roomId) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("room", roomId);
+  url.searchParams.set("role", "guest");
+  return url.toString();
+}
+
+function setFriendStatus(text) {
+  state.friend.connectionStatus = String(text || "Idle");
+  if (ui.appRoot) updateUI();
+}
+
+function setFriendError(message) {
+  state.friend.errorMessage = String(message || "");
+  if (ui.appRoot) updateUI();
 }
 
 function safePlayerName(name) {
@@ -789,7 +904,20 @@ async function backToMenu() {
   state.mode = null;
   state.friend.roomId = "";
   state.friend.role = null;
-  state.friend.link = "";
+  state.friend.hostLink = "";
+  state.friend.guestLink = "";
+  state.friend.connectionStatus = "Idle";
+  state.friend.errorMessage = "";
+  if (state.friend.copyToastTimerId) {
+    clearTimeout(state.friend.copyToastTimerId);
+    state.friend.copyToastTimerId = null;
+  }
+  if (ui.copyToast) ui.copyToast.classList.add("hidden");
+  if (state.friend.copyToastTimerId) {
+    clearTimeout(state.friend.copyToastTimerId);
+    state.friend.copyToastTimerId = null;
+  }
+  if (ui.copyToast) ui.copyToast.classList.add("hidden");
 
   state.slots.human = {
     id: net.playerId,
@@ -809,7 +937,10 @@ function startBotMatch() {
   state.mode = "bot";
   state.friend.roomId = "";
   state.friend.role = null;
-  state.friend.link = "";
+  state.friend.hostLink = "";
+  state.friend.guestLink = "";
+  state.friend.connectionStatus = "Idle";
+  state.friend.errorMessage = "";
 
   state.slots.human = {
     id: net.playerId,
@@ -826,22 +957,30 @@ function startBotMatch() {
   setTimeout(() => beginTurn(), 220);
 }
 
-function createFriendLink(roomId) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("room", roomId);
-  return url.toString();
+function prepareFriendRoomState(roomId, role) {
+  state.mode = "friend";
+  state.friend.role = role;
+  state.friend.roomId = roomId;
+  state.friend.hostLink = createHostLink(roomId);
+  state.friend.guestLink = createGuestLink(roomId);
+  state.friend.startInFlight = false;
+  state.friend.pendingRequest = null;
+  state.friend.connectionStatus = "Connecting...";
+  state.friend.errorMessage = "";
+
+  setRoomIdInUrl(roomId, role);
+  state.screen = APP_SCREENS.waiting;
+  updateUI();
 }
 
 async function createFriendRoomAsHost() {
   const roomId = createShortRoomId();
-  state.mode = "friend";
-  state.friend.role = "host";
-  state.friend.roomId = roomId;
-  state.friend.link = createFriendLink(roomId);
-  state.friend.startInFlight = false;
-  state.friend.pendingRequest = null;
-  state.localSlot = "human";
+  await joinFriendRoomAsHost(roomId);
+}
 
+async function joinFriendRoomAsHost(roomId) {
+  prepareFriendRoomState(roomId, "host");
+  state.localSlot = "human";
   state.slots.human = {
     id: net.playerId,
     name: safePlayerName(state.profile.name),
@@ -849,37 +988,25 @@ async function createFriendRoomAsHost() {
   };
   state.slots.bot = { id: "pending-guest", name: "Friend", avatarId: "avatar-2" };
 
-  setRoomIdInUrl(roomId);
-  state.screen = APP_SCREENS.waiting;
-  updateUI();
-
   const joined = await net.joinRoom(roomId, "host");
   if (!joined) {
-    setCurrentAction("Supabase connection failed.");
+    setFriendError("Could not connect to room as host.");
     return;
   }
-
+  setFriendStatus("Connected 1/2");
   updateUI();
 }
 
 async function joinFriendRoomAsGuest(roomId) {
-  state.mode = "friend";
-  state.friend.role = "guest";
-  state.friend.roomId = roomId;
-  state.friend.link = createFriendLink(roomId);
-  state.friend.startInFlight = false;
-  state.friend.pendingRequest = null;
-
-  setRoomIdInUrl(roomId);
-  state.screen = APP_SCREENS.waiting;
-  updateUI();
+  prepareFriendRoomState(roomId, "guest");
 
   const joined = await net.joinRoom(roomId, "guest");
   if (!joined) {
-    setCurrentAction("Supabase connection failed.");
+    setFriendError("Could not connect to room as guest.");
     return;
   }
 
+  setFriendStatus("Connected 1/2");
   await net.sendEvent(
     "HELLO",
     {
@@ -947,11 +1074,13 @@ async function startFriendMatchAsHost() {
   if (!payload) return;
 
   state.friend.startInFlight = true;
+  console.log("[Supabase] Host sending START");
   await net.sendEvent("START", payload, {
     canonical: true,
     actorId: net.playerId,
     applyLocal: true
   });
+  if (state.screen === APP_SCREENS.waiting) state.friend.startInFlight = false;
 }
 
 function applyFriendStart(payload) {
@@ -959,6 +1088,8 @@ function applyFriendStart(payload) {
 
   state.mode = "friend";
   state.friend.startInFlight = false;
+  state.friend.errorMessage = "";
+  state.friend.connectionStatus = "Match started";
 
   state.slots.human = {
     id: payload.players.human.id,
@@ -2004,7 +2135,7 @@ function getResultWinnerText() {
 function getConnectionBannerText() {
   const roomId = state.friend.roomId || "----";
   const role = net.role === "host" ? "Host" : net.role === "guest" ? "Guest" : "-";
-  return `Connected: ${net.connectedCount}/2 | You are ${role} | Room: ${roomId}`;
+  return `Connected: ${net.connectedCount}/2 | You are ${role} | Room: ${roomId} | ${state.friend.connectionStatus}`;
 }
 
 function renderAvatar(node, avatarId) {
@@ -2132,14 +2263,37 @@ function updateUI() {
   ui.waitingStatusText.textContent = `Connected: ${net.connectedCount}/2`;
   ui.waitingRoleText.textContent = `You are ${net.role === "host" ? "Host" : net.role === "guest" ? "Guest" : "-"}`;
   ui.waitingRoomText.textContent = `Room: ${state.friend.roomId || "----"}`;
+  ui.waitingConnectionStatusText.textContent = `Status: ${state.friend.connectionStatus}`;
+  ui.friendConnectionStatusText.textContent = `Status: ${state.friend.connectionStatus}`;
 
-  const waitingCanCopy = Boolean(state.friend.link) && net.role === "host";
-  ui.waitingLinkBlock.classList.toggle("hidden", !waitingCanCopy);
-  if (waitingCanCopy) ui.waitingLinkInput.value = state.friend.link;
+  const hasFriendError = Boolean(state.friend.errorMessage);
+  ui.waitingConnectionErrorText.classList.toggle("hidden", !hasFriendError);
+  ui.friendConnectionErrorText.classList.toggle("hidden", !hasFriendError);
+  if (hasFriendError) {
+    ui.waitingConnectionErrorText.textContent = state.friend.errorMessage;
+    ui.friendConnectionErrorText.textContent = state.friend.errorMessage;
+  } else {
+    ui.waitingConnectionErrorText.textContent = "";
+    ui.friendConnectionErrorText.textContent = "";
+  }
 
-  const friendLinkVisible = Boolean(state.friend.link) && state.screen === APP_SCREENS.friend;
-  ui.friendLinkBlock.classList.toggle("hidden", !friendLinkVisible);
-  if (friendLinkVisible) ui.friendLinkInput.value = state.friend.link;
+  const waitingLinksVisible = Boolean(state.friend.hostLink) && Boolean(state.friend.guestLink) && state.mode === "friend";
+  ui.waitingLinkBlock.classList.toggle("hidden", !waitingLinksVisible);
+  if (waitingLinksVisible) {
+    ui.waitingHostLinkInput.value = state.friend.hostLink;
+    ui.waitingGuestLinkInput.value = state.friend.guestLink;
+  }
+
+  const friendLinksVisible = Boolean(state.friend.hostLink) && Boolean(state.friend.guestLink) && state.screen === APP_SCREENS.friend;
+  ui.friendLinkBlock.classList.toggle("hidden", !friendLinksVisible);
+  if (friendLinksVisible) {
+    ui.hostLinkInput.value = state.friend.hostLink;
+    ui.friendLinkInput.value = state.friend.guestLink;
+  }
+
+  const canReconnect = state.mode === "friend" && Boolean(state.friend.roomId);
+  ui.friendReconnectBtn.classList.toggle("hidden", !canReconnect);
+  ui.waitingReconnectBtn.classList.toggle("hidden", !canReconnect);
 
   const topSlot = opponentOf(state.localSlot);
   const bottomSlot = state.localSlot;
@@ -2264,6 +2418,26 @@ async function copyToClipboard(text) {
   }
 }
 
+function showCopyToast(message) {
+  if (!ui.copyToast) return;
+  ui.copyToast.textContent = message || "Copied!";
+  ui.copyToast.classList.remove("hidden");
+  if (state.friend.copyToastTimerId) clearTimeout(state.friend.copyToastTimerId);
+  state.friend.copyToastTimerId = setTimeout(() => {
+    ui.copyToast.classList.add("hidden");
+    state.friend.copyToastTimerId = null;
+  }, 1500);
+}
+
+async function reconnectFriendRoom() {
+  if (!state.friend.roomId || !state.friend.role) return;
+  if (state.friend.role === "guest") {
+    await joinFriendRoomAsGuest(state.friend.roomId);
+    return;
+  }
+  await joinFriendRoomAsHost(state.friend.roomId);
+}
+
 function onBottomCardsClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -2328,7 +2502,10 @@ function bindEvents() {
   ui.playBotBtn.addEventListener("click", () => startBotMatch());
   ui.playFriendBtn.addEventListener("click", () => {
     state.screen = APP_SCREENS.friend;
-    state.friend.link = "";
+    state.friend.hostLink = "";
+    state.friend.guestLink = "";
+    state.friend.connectionStatus = "Idle";
+    state.friend.errorMessage = "";
     updateUI();
   });
 
@@ -2337,12 +2514,23 @@ function bindEvents() {
   });
 
   ui.copyFriendLinkBtn.addEventListener("click", async () => {
-    const ok = await copyToClipboard(state.friend.link);
-    ui.copyStatusText.textContent = ok ? "Link copied." : "Copy failed.";
+    const ok = await copyToClipboard(state.friend.guestLink);
+    if (ok) showCopyToast("Copied!");
+    else setFriendError("Clipboard copy failed. Copy manually.");
   });
 
   ui.waitingCopyBtn.addEventListener("click", async () => {
-    await copyToClipboard(state.friend.link);
+    const ok = await copyToClipboard(state.friend.guestLink);
+    if (ok) showCopyToast("Copied!");
+    else setFriendError("Clipboard copy failed. Copy manually.");
+  });
+
+  ui.friendReconnectBtn.addEventListener("click", () => {
+    void reconnectFriendRoom();
+  });
+
+  ui.waitingReconnectBtn.addEventListener("click", () => {
+    void reconnectFriendRoom();
   });
 
   ui.playAgainBtn.addEventListener("click", () => {
@@ -2431,17 +2619,24 @@ function cacheElements() {
   ui.friendBackBtn = document.getElementById("friendBackBtn");
   ui.createLinkBtn = document.getElementById("createLinkBtn");
   ui.friendLinkBlock = document.getElementById("friendLinkBlock");
+  ui.hostLinkInput = document.getElementById("hostLinkInput");
   ui.friendLinkInput = document.getElementById("friendLinkInput");
   ui.copyFriendLinkBtn = document.getElementById("copyFriendLinkBtn");
-  ui.copyStatusText = document.getElementById("copyStatusText");
+  ui.friendConnectionStatusText = document.getElementById("friendConnectionStatusText");
+  ui.friendConnectionErrorText = document.getElementById("friendConnectionErrorText");
+  ui.friendReconnectBtn = document.getElementById("friendReconnectBtn");
 
   ui.waitingBackBtn = document.getElementById("waitingBackBtn");
   ui.waitingStatusText = document.getElementById("waitingStatusText");
   ui.waitingRoleText = document.getElementById("waitingRoleText");
   ui.waitingRoomText = document.getElementById("waitingRoomText");
+  ui.waitingConnectionStatusText = document.getElementById("waitingConnectionStatusText");
+  ui.waitingConnectionErrorText = document.getElementById("waitingConnectionErrorText");
   ui.waitingLinkBlock = document.getElementById("waitingLinkBlock");
-  ui.waitingLinkInput = document.getElementById("waitingLinkInput");
+  ui.waitingHostLinkInput = document.getElementById("waitingHostLinkInput");
+  ui.waitingGuestLinkInput = document.getElementById("waitingGuestLinkInput");
   ui.waitingCopyBtn = document.getElementById("waitingCopyBtn");
+  ui.waitingReconnectBtn = document.getElementById("waitingReconnectBtn");
 
   ui.gameBackBtn = document.getElementById("gameBackBtn");
   ui.rulesBtn = document.getElementById("rulesBtn");
@@ -2483,13 +2678,14 @@ function cacheElements() {
 
   ui.rulesModal = document.getElementById("rulesModal");
   ui.rulesCloseBtn = document.getElementById("rulesCloseBtn");
+  ui.copyToast = document.getElementById("copyToast");
 }
 
 function exposeSupabaseTest() {
   window.liarsClashTestSupabase = async function liarsClashTestSupabase() {
     const ok = await net.initSupabase();
     if (!ok) {
-      console.error("[Supabase Test] Client is not initialized. Check supabase-config.js.");
+      console.error("[Supabase Test] Client is not initialized. Check supabase-public-config.js.");
       return;
     }
 
@@ -2576,7 +2772,9 @@ async function init() {
 
   const roomFromUrl = getRoomIdFromUrl();
   if (roomFromUrl) {
-    await joinFriendRoomAsGuest(roomFromUrl);
+    const roleFromUrl = getRoomRoleFromUrl();
+    if (roleFromUrl === "guest") await joinFriendRoomAsGuest(roomFromUrl);
+    else await joinFriendRoomAsHost(roomFromUrl);
   } else {
     state.screen = APP_SCREENS.home;
     updateUI();

@@ -264,6 +264,22 @@ body {
   gap: 8px;
 }
 
+.link-copy-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-copy {
+  min-width: 96px;
+}
+
+.error-text {
+  color: #8f2b2b;
+  font-weight: 800;
+}
+
 .friend-banner {
   margin: 0;
   border: 2px solid var(--line);
@@ -273,6 +289,21 @@ body {
   font-weight: 700;
   background: #eae1ce;
   line-height: 1.2;
+}
+
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--pad) + env(safe-area-inset-bottom) + 2px);
+  transform: translateX(-50%);
+  z-index: 150;
+  margin: 0;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: #f2e7d1;
+  padding: 6px 12px;
+  font-size: var(--fs-sm);
+  font-weight: 800;
 }
 
 .game-viewport {
