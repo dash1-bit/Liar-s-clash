@@ -14,7 +14,7 @@
     <section id="homeScreen" class="screen active" aria-label="Home">
       <div class="home-hero">
         <div class="title-with-logo">
-          <img id="homeLogoImg" class="title-logo hidden" alt="Liar's Clash logo" />
+          <img id="homeLogoImg" class="game-logo title-logo hidden" alt="Liar's Clash logo" />
           <h1 class="app-title">Liar's Clash</h1>
         </div>
         <p class="home-tagline">Win the mind game.</p>
@@ -31,7 +31,7 @@
         </button>
 
         <label class="field-label" for="playerNameInput">Player Name</label>
-        <input id="playerNameInput" class="text-input" type="text" maxlength="18" value="Player" autocomplete="off" />
+        <input id="playerNameInput" class="text-input" type="text" maxlength="18" value="Matt" autocomplete="off" />
 
         <button id="homePlayBtn" class="btn btn-primary btn-play-pulse" type="button">PLAY</button>
         <button id="premiumBtn" class="btn btn-premium" type="button">Become Premium</button>
@@ -49,7 +49,7 @@
       </div>
       <div class="screen-card mode-card">
         <div class="title-with-logo mode-title-row">
-          <img id="modeLogoImg" class="title-logo hidden" alt="Liar's Clash logo" />
+          <img id="modeLogoImg" class="game-logo title-logo hidden" alt="Liar's Clash logo" />
           <h2 class="section-title mode-game-title">Liar's Clash</h2>
         </div>
         <p class="helper-text mode-subtitle">Choose Mode</p>
@@ -174,7 +174,7 @@
     <section id="resultScreen" class="screen" aria-label="Match Result">
       <div class="screen-card result-card result-summary-card">
         <header class="result-brand title-with-logo title-with-logo--result">
-          <img id="resultLogoImg" class="result-logo hidden" alt="Liar's Clash logo" />
+          <img id="resultLogoImg" class="game-logo result-logo hidden" alt="Liar's Clash logo" />
           <h2 class="section-title result-game-name">Liar's Clash</h2>
         </header>
         <div class="result-duel">
@@ -213,7 +213,7 @@
           <button id="shareResultBtn" class="btn" type="button">Share</button>
           <button id="backToMenuBtn" class="btn" type="button">Back to Menu</button>
         </div>
-        <p class="result-site">Juega gratis en liar-s-clash.vercel.app</p>
+        <p class="result-site">Play free at liar-s-clash.vercel.app</p>
       </div>
     </section>
   </div>
@@ -250,7 +250,7 @@
     <div class="modal-card">
       <button id="rulesCloseBtn" class="modal-close-btn" type="button" aria-label="Close quick rules">X</button>
       <div class="title-with-logo rules-title-row">
-        <img id="rulesLogoImg" class="title-logo hidden" alt="Liar's Clash logo" />
+        <img id="rulesLogoImg" class="game-logo title-logo hidden" alt="Liar's Clash logo" />
         <h2 class="section-title rules-modal-title">Liar's Clash</h2>
       </div>
       <p class="helper-text rules-subtitle">Quick Rules</p>
@@ -295,8 +295,11 @@ STRIKE -> 1 damage (2 Gold)
   <section id="premiumModal" class="modal-overlay premium-modal hidden" role="dialog" aria-modal="true" aria-label="Premium">
     <div class="premium-shell">
       <header class="premium-topbar">
-        <h2 class="premium-title">Liar's Clash Premium</h2>
-        <button id="premiumCloseBtn" class="modal-close-btn" type="button" aria-label="Close premium modal">X</button>
+        <div class="title-with-logo premium-title-wrap">
+          <img id="premiumLogoImg" class="game-logo hidden" alt="Liar's Clash logo" />
+          <h2 class="premium-title">Liar's Clash Premium</h2>
+        </div>
+        <button id="premiumCloseBtn" class="modal-close-btn premium-close-btn" type="button" aria-label="Close premium modal">X</button>
       </header>
       <section class="premium-hero">
         <p class="premium-price">$4.99 / month</p>

@@ -103,6 +103,7 @@ const ASSET_VERSION = "3";
 const UI_TIMINGS = Object.freeze({
   actionToastMs: 1800,
   currentActionTypeMs: 25,
+  currentActionPauseMs: 2000,
   homeTipsRotateMs: 5000
 });
 
@@ -146,6 +147,7 @@ const ui = {};
 const uiRuntime = {
   actionToastTimerId: null,
   currentActionTypeTimerId: null,
+  currentActionPauseTimerId: null,
   currentActionTypeToken: 0,
   lastActionText: "",
   homeTipTimerId: null,
@@ -156,7 +158,7 @@ const modalState = { activeModal: null };
 const state = {
   screen: APP_SCREENS.home,
   mode: null,
-  profile: { name: "Player", avatarId: "avatar-1", level: 1, ranking: 1000, opponentRanking: 1000 },
+  profile: { name: "Matt", avatarId: "avatar-1", level: 1, ranking: 1000, opponentRanking: 1000 },
   home: { tipIndex: 0 },
   friend: {
     roomId: "",
@@ -171,7 +173,7 @@ const state = {
   },
   localSlot: "human",
   slots: {
-    human: { id: "local-human", name: "Player", avatarId: "avatar-1" },
+    human: { id: "local-human", name: "Matt", avatarId: "avatar-1" },
     bot: { id: "bot-ai", name: "Bot", avatarId: "avatar-bot" }
   },
   phase: PHASES.idle,
@@ -837,7 +839,7 @@ function bindLogoImageNode(node) {
 
 function refreshLogoImages() {
   const logoPath = getLogoPath();
-  const nodes = [ui.homeLogoImg, ui.modeLogoImg, ui.rulesLogoImg, ui.resultLogoImg];
+  const nodes = [ui.homeLogoImg, ui.modeLogoImg, ui.rulesLogoImg, ui.resultLogoImg, ui.premiumLogoImg];
   nodes.forEach((node) => {
     if (!node) return;
     bindLogoImageNode(node);
@@ -3430,6 +3432,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
   const artLayer = document.createElement("span");
   artLayer.className = "card-art";
   if (card.role === "ANGEL") artLayer.classList.add("card-art-angel");
+  if (card.role === "JOKER") artLayer.classList.add("card-art-joker");
   const roleImagePath = getRoleImagePath(card.role);
   if (roleImagePath) artLayer.style.backgroundImage = `url("${roleImagePath}")`;
   node.appendChild(artLayer);
@@ -3698,9 +3701,11 @@ function updateUI() {
     const accepted = Boolean(state.draft.accepted[state.localSlot]);
     ui.draftAcceptBtn.disabled = accepted;
     ui.draftAcceptBtn.textContent = accepted ? "WAITING..." : "ACCEPT";
+    ui.draftAcceptBtn.classList.toggle("draft-accept-attention", !accepted);
   } else {
     ui.draftAcceptBtn.disabled = false;
     ui.draftAcceptBtn.textContent = "ACCEPT";
+    ui.draftAcceptBtn.classList.remove("draft-accept-attention");
   }
 
   renderCardsForSlot(ui.topCards, topSlot, false);
@@ -3857,8 +3862,12 @@ function clearActionToast() {
 
 function stopCurrentActionTypewriter() {
   if (uiRuntime.currentActionTypeTimerId) {
-    clearInterval(uiRuntime.currentActionTypeTimerId);
+    clearTimeout(uiRuntime.currentActionTypeTimerId);
     uiRuntime.currentActionTypeTimerId = null;
+  }
+  if (uiRuntime.currentActionPauseTimerId) {
+    clearTimeout(uiRuntime.currentActionPauseTimerId);
+    uiRuntime.currentActionPauseTimerId = null;
   }
 }
 
@@ -3867,7 +3876,7 @@ function renderCurrentActionTypewriter(text) {
   const nextText = String(text || "");
 
   if (nextText === uiRuntime.lastActionText) {
-    if (ui.currentActionText.textContent !== nextText && !uiRuntime.currentActionTypeTimerId) {
+    if (ui.currentActionText.textContent !== nextText && !uiRuntime.currentActionTypeTimerId && !uiRuntime.currentActionPauseTimerId) {
       ui.currentActionText.textContent = nextText;
     }
     return;
@@ -3885,7 +3894,7 @@ function renderCurrentActionTypewriter(text) {
 
   let index = 0;
   ui.currentActionText.textContent = "";
-  uiRuntime.currentActionTypeTimerId = setInterval(() => {
+  const typeNext = () => {
     if (token !== uiRuntime.currentActionTypeToken) {
       stopCurrentActionTypewriter();
       return;
@@ -3893,9 +3902,16 @@ function renderCurrentActionTypewriter(text) {
     index += 1;
     ui.currentActionText.textContent = nextText.slice(0, index);
     if (index >= nextText.length) {
-      stopCurrentActionTypewriter();
+      uiRuntime.currentActionTypeTimerId = null;
+      uiRuntime.currentActionPauseTimerId = setTimeout(() => {
+        if (token !== uiRuntime.currentActionTypeToken) return;
+        uiRuntime.currentActionPauseTimerId = null;
+      }, UI_TIMINGS.currentActionPauseMs);
+      return;
     }
-  }, UI_TIMINGS.currentActionTypeMs);
+    uiRuntime.currentActionTypeTimerId = setTimeout(typeNext, UI_TIMINGS.currentActionTypeMs);
+  };
+  uiRuntime.currentActionTypeTimerId = setTimeout(typeNext, UI_TIMINGS.currentActionTypeMs);
 }
 
 async function reconnectFriendRoom() {
@@ -4199,6 +4215,7 @@ function cacheElements() {
   ui.rulesLogoImg = document.getElementById("rulesLogoImg");
   ui.premiumModal = document.getElementById("premiumModal");
   ui.premiumCloseBtn = document.getElementById("premiumCloseBtn");
+  ui.premiumLogoImg = document.getElementById("premiumLogoImg");
   ui.goPremiumBtn = document.getElementById("goPremiumBtn");
   ui.copyToast = document.getElementById("copyToast");
   ui.actionToast = document.getElementById("actionToast");

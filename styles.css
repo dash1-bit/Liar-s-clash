@@ -159,15 +159,29 @@ body {
   gap: clamp(6px, 2vw, 10px);
 }
 
-.title-logo {
-  width: clamp(26px, 7.6vw, 38px);
-  height: clamp(26px, 7.6vw, 38px);
+.game-logo {
+  height: var(--game-logo-size, 1.25rem);
+  width: auto;
+  max-height: var(--game-logo-size, 1.25rem);
   object-fit: contain;
   flex: 0 0 auto;
+  display: block;
+}
+
+.title-logo {
+  width: auto;
+}
+
+.home-hero .title-with-logo {
+  --game-logo-size: var(--fs-xl);
 }
 
 .mode-title-row .section-title {
   text-align: left;
+}
+
+.mode-title-row {
+  --game-logo-size: clamp(1.2rem, 3.6vw, 1.8rem);
 }
 
 .mode-subtitle {
@@ -666,6 +680,7 @@ body {
   border-radius: 10px;
   min-height: clamp(64px, 11.2vh, 88px);
   position: relative;
+  isolation: isolate;
   overflow: hidden;
   padding: 4px;
   display: grid;
@@ -770,7 +785,15 @@ body {
 }
 
 .card-art-angel {
+  background-color: #262421;
   mix-blend-mode: multiply;
+  filter: contrast(1.06) brightness(0.96);
+}
+
+.card-art-joker {
+  background-color: #262421;
+  mix-blend-mode: multiply;
+  filter: contrast(1.06) brightness(0.96);
 }
 
 .draft-waiting-card {
@@ -780,10 +803,14 @@ body {
 }
 
 .card-grid.draft-needs-accept {
-  border: 1px solid rgba(129, 182, 76, 0.46);
+  border: 2px solid rgba(129, 182, 76, 0.84);
   border-radius: 10px;
   padding: 4px;
-  animation: draftAreaPulse 1.35s ease-in-out infinite;
+  box-shadow:
+    inset 0 0 0 1px rgba(129, 182, 76, 0.42),
+    0 0 0 2px rgba(129, 182, 76, 0.24),
+    0 0 18px rgba(129, 182, 76, 0.36);
+  animation: draftAreaPulse 1.6s ease-in-out infinite;
 }
 
 .card-text-fade {
@@ -914,6 +941,20 @@ body {
 .draft-accept-btn {
   margin-top: 4px;
   min-height: 44px;
+}
+
+.draft-accept-btn.draft-accept-attention {
+  border-color: rgba(234, 197, 93, 0.9);
+  background: linear-gradient(180deg, #f4d56a 0%, #81b64c 100%);
+  color: #19240b;
+  box-shadow:
+    0 0 0 1px rgba(234, 197, 93, 0.42),
+    0 0 14px rgba(234, 197, 93, 0.42);
+  animation: draftAcceptPulse 1.08s ease-in-out infinite;
+}
+
+.draft-accept-btn.draft-accept-attention:disabled {
+  animation: none;
 }
 
 .panel-subtitle {
@@ -1080,15 +1121,16 @@ body {
 }
 
 .result-logo {
-  width: clamp(32px, 9.5vw, 52px);
-  height: clamp(32px, 9.5vw, 52px);
-  max-height: none;
-  object-fit: contain;
+  width: auto;
 }
 
 .result-game-name {
   text-align: left;
   font-size: clamp(1.26rem, 4.6vw, 1.92rem);
+}
+
+.title-with-logo--result {
+  --game-logo-size: clamp(1.26rem, 4.6vw, 1.92rem);
 }
 
 .result-headline {
@@ -1257,13 +1299,26 @@ body {
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   gap: 10px;
+  position: relative;
 }
 
 .premium-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
+  position: relative;
+  padding-right: calc(var(--tap) + 8px);
+}
+
+.premium-title-wrap {
+  justify-content: flex-start;
+  --game-logo-size: clamp(1.12rem, 3.5vw, 1.46rem);
+}
+
+.premium-close-btn {
+  top: 0;
+  right: 0;
 }
 
 .premium-title {
@@ -1391,6 +1446,7 @@ body {
 .rules-title-row {
   justify-content: flex-start;
   padding-right: calc(var(--tap) + 8px);
+  --game-logo-size: clamp(1.02rem, 3.4vw, 1.28rem);
 }
 
 .rules-modal-title {
@@ -1557,13 +1613,43 @@ body {
 
 @keyframes draftAreaPulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(129, 182, 76, 0.18);
+    box-shadow:
+      inset 0 0 0 1px rgba(129, 182, 76, 0.36),
+      0 0 0 1px rgba(129, 182, 76, 0.24),
+      0 0 12px rgba(129, 182, 76, 0.26);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(129, 182, 76, 0.28);
+    box-shadow:
+      inset 0 0 0 1px rgba(129, 182, 76, 0.58),
+      0 0 0 3px rgba(129, 182, 76, 0.36),
+      0 0 24px rgba(129, 182, 76, 0.48);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(129, 182, 76, 0.18);
+    box-shadow:
+      inset 0 0 0 1px rgba(129, 182, 76, 0.36),
+      0 0 0 1px rgba(129, 182, 76, 0.24),
+      0 0 12px rgba(129, 182, 76, 0.26);
+  }
+}
+
+@keyframes draftAcceptPulse {
+  0% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 1px rgba(234, 197, 93, 0.4),
+      0 0 12px rgba(234, 197, 93, 0.34);
+  }
+  50% {
+    transform: scale(1.03);
+    box-shadow:
+      0 0 0 2px rgba(234, 197, 93, 0.58),
+      0 0 20px rgba(234, 197, 93, 0.56);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 1px rgba(234, 197, 93, 0.4),
+      0 0 12px rgba(234, 197, 93, 0.34);
   }
 }
 
