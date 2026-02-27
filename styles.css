@@ -368,6 +368,10 @@ body {
   transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
+#bottomPanel.player-panel {
+  grid-template-rows: auto 1fr;
+}
+
 .player-panel.turn-active {
   border-color: rgba(129, 182, 76, 0.82);
   background: rgba(50, 46, 41, 0.98);
@@ -639,16 +643,36 @@ body {
 
 .bottom-cards-actions {
   display: grid;
-  grid-template-columns: minmax(0, 4fr) minmax(0, 2fr);
+  grid-template-rows: auto auto;
+  grid-template-columns: 1fr;
   gap: var(--gap);
-  align-items: stretch;
+  align-content: end;
+  height: 100%;
 }
 
-.basic-actions {
+#bottomPanel .basic-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: clamp(4px, 1.1vw, 6px);
   align-items: stretch;
+  grid-row: 1;
+}
+
+#bottomPanel #bottomCards {
+  grid-row: 2;
+}
+
+#bottomPanel .action-btn {
+  min-height: clamp(44px, 7.2vh, 56px);
+  max-height: clamp(44px, 7.2vh, 56px);
+  padding-top: 4px;
+  padding-bottom: 4px;
+  position: relative;
+  font-size: var(--fs-sm);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  line-height: 1.1;
 }
 
 .action-btn {
