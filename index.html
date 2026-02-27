@@ -14,7 +14,7 @@
     <section id="homeScreen" class="screen active" aria-label="Home">
       <div class="home-hero">
         <h1 class="app-title">Liar's Clash</h1>
-        <p class="home-tagline">Bluff, reveal, and outsmart your opponent.</p>
+        <p class="home-tagline">Win the mind game.</p>
       </div>
       <div class="screen-card home-card">
         <div class="home-stats-row">
@@ -31,6 +31,7 @@
         <input id="playerNameInput" class="text-input" type="text" maxlength="18" value="Player" autocomplete="off" />
 
         <button id="homePlayBtn" class="btn btn-primary btn-play-pulse" type="button">PLAY</button>
+        <button id="premiumBtn" class="btn btn-premium" type="button">Become Premium</button>
       </div>
       <section class="home-tips" aria-label="Tips">
         <p class="home-tips-title">Tips</p>
@@ -159,17 +160,48 @@
     </section>
 
     <section id="resultScreen" class="screen" aria-label="Match Result">
-      <div class="top-row">
-        <button id="resultBackBtn" class="btn btn-back" type="button">Back to Menu</button>
-      </div>
-      <div class="screen-card result-card">
-        <h2 id="resultWinnerText" class="section-title">YOU WIN</h2>
+      <div class="screen-card result-card result-summary-card">
+        <header class="result-brand">
+          <img id="resultLogoImg" class="result-logo hidden" alt="Liar's Clash logo" />
+          <h2 id="resultLogoFallback" class="section-title">Liar's Clash</h2>
+        </header>
+        <div class="result-duel">
+          <p id="resultDuelNames" class="result-duel-names">Player vs Opponent</p>
+          <div class="result-duel-avatars">
+            <div id="resultLocalCard" class="result-avatar-card">
+              <span id="resultLocalAvatar" class="avatar-art result-avatar-art"></span>
+              <p id="resultLocalName" class="result-avatar-name">Player</p>
+              <span class="result-winner-tag">WINNER</span>
+            </div>
+            <div id="resultOpponentCard" class="result-avatar-card">
+              <span id="resultOpponentAvatar" class="avatar-art result-avatar-art"></span>
+              <p id="resultOpponentName" class="result-avatar-name">Opponent</p>
+              <span class="result-winner-tag">WINNER</span>
+            </div>
+          </div>
+        </div>
+        <h2 id="resultWinnerText" class="section-title result-headline">YOU WIN</h2>
         <p id="resultSummaryText" class="helper-text">Result summary</p>
-        <p id="resultStatsText" class="helper-text">Player: 0 HP, 0 Gold | Opponent: 0 HP, 0 Gold</p>
+        <div class="result-stats-grid">
+          <div class="result-stats-card">
+            <p id="resultLocalStatsLabel" class="result-stats-label">Player</p>
+            <p id="resultLocalHpText" class="result-stats-line">HP: 0</p>
+            <p id="resultLocalGoldText" class="result-stats-line">Gold: 0</p>
+            <p id="resultLocalRankText" class="result-stats-line">Ranking: 1000</p>
+          </div>
+          <div class="result-stats-card">
+            <p id="resultOpponentStatsLabel" class="result-stats-label">Opponent</p>
+            <p id="resultOpponentHpText" class="result-stats-line">HP: 0</p>
+            <p id="resultOpponentGoldText" class="result-stats-line">Gold: 0</p>
+            <p id="resultOpponentRankText" class="result-stats-line">Ranking: 1000</p>
+          </div>
+        </div>
         <div class="result-actions">
           <button id="playAgainBtn" class="btn mode-btn" type="button">Play Again</button>
+          <button id="shareResultBtn" class="btn" type="button">Share</button>
           <button id="backToMenuBtn" class="btn" type="button">Back to Menu</button>
         </div>
+        <p class="result-site">liar-s-clash.vercel.app</p>
       </div>
     </section>
   </div>
@@ -240,6 +272,30 @@ STRIKE -> 1 damage (2 Gold)
 
 ===</pre>
       <div id="rulesRoleList" class="rules-role-list" aria-label="Role list with card images"></div>
+    </div>
+  </section>
+
+  <section id="premiumModal" class="modal-overlay premium-modal hidden" role="dialog" aria-modal="true" aria-label="Premium">
+    <div class="premium-shell">
+      <header class="premium-topbar">
+        <h2 class="premium-title">Liar’s Clash Premium</h2>
+        <button id="premiumCloseBtn" class="modal-close-btn" type="button" aria-label="Close premium modal">X</button>
+      </header>
+      <section class="premium-hero">
+        <p class="premium-price">$4.99 / month</p>
+        <button id="goPremiumBtn" class="btn btn-premium premium-go-btn" type="button">Go Premium</button>
+      </section>
+      <section class="premium-benefits" aria-label="Premium benefits">
+        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Join all tournaments</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Weekly prize tournament included!</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Create private tournaments</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Exclusive avatars</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Character skins</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Special bots + trainer</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>No ads</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Deep analysis</span></article>
+      </section>
+      <p class="premium-disclaimer">Premium features do not provide in-game advantages.</p>
     </div>
   </section>
 

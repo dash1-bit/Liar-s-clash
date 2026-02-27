@@ -115,6 +115,13 @@ body {
   border-color: #6c993f;
 }
 
+.btn-premium {
+  background: linear-gradient(180deg, #f9d76f 0%, #e2b642 100%);
+  border-color: #c9972d;
+  color: #2b1d04;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
 .btn-secondary {
   background: #2a2825;
 }
@@ -210,6 +217,11 @@ body {
 
 .home-card {
   margin: 0;
+}
+
+.home-card .btn-premium {
+  min-height: clamp(46px, 8.4vh, 58px);
+  font-size: var(--fs-md);
 }
 
 .mode-card,
@@ -1010,6 +1022,128 @@ body {
   gap: 8px;
 }
 
+.result-summary-card {
+  margin: auto 0;
+  gap: 9px;
+}
+
+.result-brand {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.result-logo {
+  width: min(54vw, 180px);
+  max-height: 56px;
+  object-fit: contain;
+}
+
+.result-headline {
+  margin-top: 2px;
+}
+
+.result-duel {
+  display: grid;
+  gap: 6px;
+}
+
+.result-duel-names {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: #f1f1ef;
+}
+
+.result-duel-avatars {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.result-avatar-card {
+  border: 1px solid rgba(120, 115, 107, 0.55);
+  border-radius: 10px;
+  padding: 6px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  background: rgba(35, 33, 30, 0.88);
+}
+
+.result-avatar-card.is-winner {
+  border-color: rgba(129, 182, 76, 0.9);
+  box-shadow: 0 0 0 1px rgba(129, 182, 76, 0.42), 0 0 14px rgba(129, 182, 76, 0.28);
+}
+
+.result-avatar-card.is-draw .result-winner-tag {
+  visibility: hidden;
+}
+
+.result-avatar-art {
+  width: clamp(46px, 13vw, 58px);
+}
+
+.result-avatar-name {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.result-winner-tag {
+  font-size: clamp(0.52rem, 1.6vw, 0.65rem);
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #17290a;
+  background: rgba(129, 182, 76, 0.96);
+  border: 1px solid rgba(129, 182, 76, 0.8);
+  border-radius: 999px;
+  padding: 2px 6px;
+  visibility: hidden;
+}
+
+.result-avatar-card.is-winner .result-winner-tag {
+  visibility: visible;
+}
+
+.result-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.result-stats-card {
+  border: 1px solid rgba(119, 114, 106, 0.54);
+  border-radius: 10px;
+  background: rgba(36, 34, 31, 0.9);
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+}
+
+.result-stats-label {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 900;
+  color: #f3f3f0;
+}
+
+.result-stats-line {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: #dededb;
+  font-weight: 700;
+}
+
+.result-site {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1018,6 +1152,89 @@ body {
   place-items: center;
   background: rgba(12, 11, 10, 0.68);
   padding: 12px;
+}
+
+.premium-modal {
+  padding: 0;
+}
+
+.premium-shell {
+  width: min(100vw, 430px);
+  height: 100dvh;
+  background: linear-gradient(180deg, #232220 0%, #1a1918 100%);
+  border-left: 1px solid rgba(132, 127, 118, 0.35);
+  border-right: 1px solid rgba(132, 127, 118, 0.35);
+  padding: calc(var(--pad) + env(safe-area-inset-top)) var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 10px;
+}
+
+.premium-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.premium-title {
+  margin: 0;
+  font-size: clamp(1.12rem, 3.5vw, 1.46rem);
+}
+
+.premium-hero {
+  border: 2px solid rgba(201, 151, 45, 0.66);
+  border-radius: 12px;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(248, 214, 111, 0.16), rgba(94, 72, 27, 0.2));
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.premium-price {
+  margin: 0;
+  font-size: clamp(1.06rem, 3.2vw, 1.28rem);
+  font-weight: 900;
+  color: #f7dc8e;
+}
+
+.premium-go-btn {
+  width: 100%;
+  max-width: 260px;
+  min-height: clamp(48px, 8.6vh, 60px);
+}
+
+.premium-benefits {
+  overflow: auto;
+  display: grid;
+  gap: 7px;
+}
+
+.premium-benefit {
+  border: 1px solid rgba(128, 122, 113, 0.45);
+  border-radius: 10px;
+  background: rgba(38, 36, 33, 0.9);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.premium-benefit-icon {
+  color: #f2cb63;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.premium-disclaimer {
+  margin: 0;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 
 .modal-card {

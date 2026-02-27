@@ -87,7 +87,8 @@ const ASSET_MAP = Object.freeze({
     shield: "./Recursos/Shield.png",
     sword: "./Recursos/Sword.png"
   }),
-  badgePath: "./Recursos/Badge.png"
+  badgePath: "./Recursos/Badge.png",
+  logoPath: "./Recursos/logo.png"
 });
 
 const AVATAR_PRESETS = Object.freeze({
@@ -111,9 +112,9 @@ const HOME_TIPS = Object.freeze([
   "If they hesitate, they might be lying.",
   "Use reveals to reduce uncertainty, not to show off.",
   "Track which cards are REAL/FAKE as the match evolves.",
-  "Don’t accuse on impulse—accuse when the risk is worth it.",
+  "Don\u2019t accuse on impulse\u2014accuse when the risk is worth it.",
   "Swap smart in the opening: keep flexible options.",
-  "Pressure low HP opponents—force tough decisions.",
+  "Pressure low HP opponents\u2014force tough decisions.",
   "Sometimes ACCEPT is the best punish.",
   "Win the mind game, not just the numbers."
 ]);
@@ -155,7 +156,7 @@ const modalState = { activeModal: null };
 const state = {
   screen: APP_SCREENS.home,
   mode: null,
-  profile: { name: "Player", avatarId: "avatar-1", level: 1, ranking: 1000 },
+  profile: { name: "Player", avatarId: "avatar-1", level: 1, ranking: 1000, opponentRanking: 1000 },
   home: { tipIndex: 0 },
   friend: {
     roomId: "",
@@ -817,6 +818,10 @@ function getAvatarPath(avatarId) {
 
 function getRoleImagePath(role) {
   return withAssetVersion(ASSET_MAP.roleImagePaths[role] || "");
+}
+
+function getLogoPath() {
+  return withAssetVersion(ASSET_MAP.logoPath || "");
 }
 
 function createInlineIcon(iconKey, className = "inline-icon") {
@@ -1655,7 +1660,8 @@ function startBotMatch() {
     name: safePlayerName(state.profile.name),
     avatarId: normalizeAvatarId(state.profile.avatarId)
   };
-  state.slots.bot = { id: "bot-ai", name: "Bot", avatarId: "avatar-bot" };
+  const botIdentity = chooseBotIdentity();
+  state.slots.bot = { id: "bot-ai", name: botIdentity.name, avatarId: botIdentity.avatarId };
   state.localSlot = "human";
 
   const matchSeed = generateMatchSeed();
@@ -2306,6 +2312,7 @@ function concludeMatch(winnerKey, reason) {
   if (winnerKey === "human" || winnerKey === "bot") {
     const delta = winnerKey === state.localSlot ? 50 : -50;
     state.profile.ranking = Math.max(0, state.profile.ranking + delta);
+    state.profile.opponentRanking = Math.max(0, state.profile.opponentRanking - delta);
   }
   state.phase = PHASES.matchEnd;
   state.screen = APP_SCREENS.result;
@@ -3313,6 +3320,10 @@ function getResultWinnerText() {
   return "MATCH END";
 }
 
+function getSlotRanking(slot) {
+  return slot === state.localSlot ? state.profile.ranking : state.profile.opponentRanking;
+}
+
 function getConnectionBannerText() {
   const roomId = state.friend.roomId || "----";
   const role = net.role === "host" ? "Host" : net.role === "guest" ? "Guest" : "-";
@@ -3660,7 +3671,37 @@ function updateUI() {
 
   ui.resultWinnerText.textContent = getResultWinnerText();
   ui.resultSummaryText.textContent = state.matchEndReason || "Match complete.";
-  ui.resultStatsText.textContent = `${slotName("human")}: ${state.players.human.hp} HP, ${state.players.human.gold} Gold | ${slotName("bot")}: ${state.players.bot.hp} HP, ${state.players.bot.gold} Gold`;
+
+  const localSlot = state.localSlot || "human";
+  const opponentSlot = opponentOf(localSlot);
+  const localPlayer = state.players[localSlot];
+  const opponentPlayer = state.players[opponentSlot];
+
+  if (ui.resultDuelNames) ui.resultDuelNames.textContent = `${slotName(localSlot)} vs ${slotName(opponentSlot)}`;
+  if (ui.resultLocalName) ui.resultLocalName.textContent = slotName(localSlot);
+  if (ui.resultOpponentName) ui.resultOpponentName.textContent = slotName(opponentSlot);
+  if (ui.resultLocalStatsLabel) ui.resultLocalStatsLabel.textContent = slotName(localSlot);
+  if (ui.resultOpponentStatsLabel) ui.resultOpponentStatsLabel.textContent = slotName(opponentSlot);
+  if (ui.resultLocalHpText) ui.resultLocalHpText.textContent = `HP: ${localPlayer.hp}`;
+  if (ui.resultOpponentHpText) ui.resultOpponentHpText.textContent = `HP: ${opponentPlayer.hp}`;
+  if (ui.resultLocalGoldText) ui.resultLocalGoldText.textContent = `Gold: ${localPlayer.gold}`;
+  if (ui.resultOpponentGoldText) ui.resultOpponentGoldText.textContent = `Gold: ${opponentPlayer.gold}`;
+  if (ui.resultLocalRankText) ui.resultLocalRankText.textContent = `Ranking: ${getSlotRanking(localSlot)}`;
+  if (ui.resultOpponentRankText) ui.resultOpponentRankText.textContent = `Ranking: ${getSlotRanking(opponentSlot)}`;
+  if (ui.resultLocalCard) ui.resultLocalCard.classList.toggle("is-winner", state.matchWinner === localSlot);
+  if (ui.resultOpponentCard) ui.resultOpponentCard.classList.toggle("is-winner", state.matchWinner === opponentSlot);
+  if (ui.resultLocalCard) ui.resultLocalCard.classList.toggle("is-draw", state.matchWinner === "draw");
+  if (ui.resultOpponentCard) ui.resultOpponentCard.classList.toggle("is-draw", state.matchWinner === "draw");
+  renderAvatar(ui.resultLocalAvatar, state.slots[localSlot].avatarId);
+  renderAvatar(ui.resultOpponentAvatar, state.slots[opponentSlot].avatarId);
+
+  if (ui.resultLogoImg && ui.resultLogoFallback) {
+    const logoPath = getLogoPath();
+    if (ui.resultLogoImg.dataset.src !== logoPath) {
+      ui.resultLogoImg.dataset.src = logoPath;
+      ui.resultLogoImg.src = logoPath;
+    }
+  }
 }
 
 function triggerAnimation(element, className) {
@@ -3872,6 +3913,7 @@ function applyCanonicalFromLocalStartIfNeeded() {
 
 function bindEvents() {
   ui.homePlayBtn.addEventListener("click", () => runToModeScreen());
+  ui.premiumBtn.addEventListener("click", () => openModal(ui.premiumModal));
 
   ui.modeBackBtn.addEventListener("click", () => {
     state.screen = APP_SCREENS.home;
@@ -3890,12 +3932,11 @@ function bindEvents() {
     void backToMenu();
   });
 
-  ui.resultBackBtn.addEventListener("click", () => {
-    void backToMenu();
-  });
-
   ui.backToMenuBtn.addEventListener("click", () => {
     void backToMenu();
+  });
+  ui.shareResultBtn.addEventListener("click", () => {
+    showActionToast("Share coming soon");
   });
 
   ui.playBotBtn.addEventListener("click", () => startBotMatch());
@@ -3966,6 +4007,8 @@ function bindEvents() {
 
   ui.rulesBtn.addEventListener("click", () => openModal(ui.rulesModal));
   ui.rulesCloseBtn.addEventListener("click", () => closeModal(ui.rulesModal));
+  ui.premiumCloseBtn.addEventListener("click", () => closeModal(ui.premiumModal));
+  ui.goPremiumBtn.addEventListener("click", () => showActionToast("Available soon"));
 
   ui.avatarPreviewBtn.addEventListener("click", () => openModal(ui.avatarModal));
   ui.avatarGrid.addEventListener("click", onAvatarChoice);
@@ -3990,6 +4033,7 @@ function bindEvents() {
 
   bindModalDismiss(ui.rulesModal, ui.rulesCloseBtn);
   bindModalDismiss(ui.avatarModal, ui.avatarModalCloseBtn);
+  bindModalDismiss(ui.premiumModal, ui.premiumCloseBtn);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeModal();
@@ -4009,6 +4053,7 @@ function cacheElements() {
   ui.resultScreen = document.getElementById("resultScreen");
 
   ui.homePlayBtn = document.getElementById("homePlayBtn");
+  ui.premiumBtn = document.getElementById("premiumBtn");
   ui.homeLevelValue = document.getElementById("homeLevelValue");
   ui.homeRankingValue = document.getElementById("homeRankingValue");
   ui.homeTipText = document.getElementById("homeTipText");
@@ -4074,10 +4119,26 @@ function cacheElements() {
   ui.acceptBtn = document.getElementById("acceptBtn");
   ui.challengeBtn = document.getElementById("challengeBtn");
 
-  ui.resultBackBtn = document.getElementById("resultBackBtn");
   ui.resultWinnerText = document.getElementById("resultWinnerText");
   ui.resultSummaryText = document.getElementById("resultSummaryText");
-  ui.resultStatsText = document.getElementById("resultStatsText");
+  ui.resultLogoImg = document.getElementById("resultLogoImg");
+  ui.resultLogoFallback = document.getElementById("resultLogoFallback");
+  ui.resultDuelNames = document.getElementById("resultDuelNames");
+  ui.resultLocalCard = document.getElementById("resultLocalCard");
+  ui.resultOpponentCard = document.getElementById("resultOpponentCard");
+  ui.resultLocalAvatar = document.getElementById("resultLocalAvatar");
+  ui.resultOpponentAvatar = document.getElementById("resultOpponentAvatar");
+  ui.resultLocalName = document.getElementById("resultLocalName");
+  ui.resultOpponentName = document.getElementById("resultOpponentName");
+  ui.resultLocalStatsLabel = document.getElementById("resultLocalStatsLabel");
+  ui.resultOpponentStatsLabel = document.getElementById("resultOpponentStatsLabel");
+  ui.resultLocalHpText = document.getElementById("resultLocalHpText");
+  ui.resultOpponentHpText = document.getElementById("resultOpponentHpText");
+  ui.resultLocalGoldText = document.getElementById("resultLocalGoldText");
+  ui.resultOpponentGoldText = document.getElementById("resultOpponentGoldText");
+  ui.resultLocalRankText = document.getElementById("resultLocalRankText");
+  ui.resultOpponentRankText = document.getElementById("resultOpponentRankText");
+  ui.shareResultBtn = document.getElementById("shareResultBtn");
   ui.playAgainBtn = document.getElementById("playAgainBtn");
   ui.backToMenuBtn = document.getElementById("backToMenuBtn");
 
@@ -4088,6 +4149,9 @@ function cacheElements() {
   ui.rulesModal = document.getElementById("rulesModal");
   ui.rulesCloseBtn = document.getElementById("rulesCloseBtn");
   ui.rulesRoleList = document.getElementById("rulesRoleList");
+  ui.premiumModal = document.getElementById("premiumModal");
+  ui.premiumCloseBtn = document.getElementById("premiumCloseBtn");
+  ui.goPremiumBtn = document.getElementById("goPremiumBtn");
   ui.copyToast = document.getElementById("copyToast");
   ui.actionToast = document.getElementById("actionToast");
 }
@@ -4170,6 +4234,16 @@ function exposeSupabaseTest() {
 
 async function init() {
   cacheElements();
+  if (ui.resultLogoImg && ui.resultLogoFallback) {
+    ui.resultLogoImg.addEventListener("load", () => {
+      ui.resultLogoImg.classList.remove("hidden");
+      ui.resultLogoFallback.classList.add("hidden");
+    });
+    ui.resultLogoImg.addEventListener("error", () => {
+      ui.resultLogoImg.classList.add("hidden");
+      ui.resultLogoFallback.classList.remove("hidden");
+    });
+  }
   applyAssetCssVariables();
   renderAvatarChoices();
   renderRulesRoleList();
@@ -4209,3 +4283,4 @@ window.initSupabase = () => net.initSupabase();
 window.joinRoom = (roomId, role) => net.joinRoom(roomId, role);
 window.sendEvent = (type, payload) => net.sendEvent(type, payload);
 window.handleEvent = (msg) => net.handleEvent(msg);
+
