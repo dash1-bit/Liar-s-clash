@@ -79,7 +79,18 @@ const AVATAR_PRESETS = Object.freeze({
   "avatar-bot": Object.freeze({ id: "avatar-bot", label: "Bot" })
 });
 
+const UI_TIMINGS = Object.freeze({
+  actionToastMs: 1800,
+  currentActionTypeMs: 25
+});
+
 const ui = {};
+const uiRuntime = {
+  actionToastTimerId: null,
+  currentActionTypeTimerId: null,
+  currentActionTypeToken: 0,
+  lastActionText: ""
+};
 const modalState = { activeModal: null };
 
 const state = {
@@ -780,6 +791,42 @@ function renderStatsForSlot(node, slot) {
   }
 }
 
+function extractCardIndex(input) {
+  if (typeof input === "number") return input;
+  if (input && typeof input === "object") {
+    if (typeof input.cardIndex === "number") return input.cardIndex;
+    if (typeof input.index === "number") return input.index;
+  }
+  return null;
+}
+
+function getInvalidActionFeedback(input) {
+  if (state.screen !== APP_SCREENS.game || state.phase !== PHASES.choosingAction || state.currentActor !== state.localSlot) {
+    return "Not your turn.";
+  }
+  if (state.friend.pendingRequest) return "Not your turn.";
+
+  const player = state.players[state.localSlot];
+  if (typeof input === "string") {
+    const actionId = input.toUpperCase();
+    const basic = BASIC_ACTIONS[actionId];
+    if (!basic) return "Not your turn.";
+    if (player.gold < basic.cost) return "Not enough gold.";
+    return null;
+  }
+
+  const cardIndex = extractCardIndex(input);
+  if (cardIndex === null) return "Not your turn.";
+  const card = player.cards[cardIndex];
+  if (!card) return "Not your turn.";
+  const meta = getRoleMeta(card.role);
+  if (!meta) return "Not your turn.";
+  if (meta.passive) return "Passive ability cannot be played.";
+  if (player.gold < meta.cost) return "Not enough gold.";
+  if (!canUseRoleByUses(state.localSlot, card.role)) return "Uses exhausted.";
+  return null;
+}
+
 function opponentOf(slot) {
   return slot === "human" ? "bot" : "human";
 }
@@ -1049,6 +1096,9 @@ function runToModeScreen() {
 async function backToMenu() {
   clearTimer();
   cancelResolutionQueue();
+  stopCurrentActionTypewriter();
+  uiRuntime.lastActionText = "";
+  clearActionToast();
   state.phase = PHASES.idle;
   state.matchWinner = null;
   state.pendingAction = null;
@@ -2174,10 +2224,11 @@ function applyCanonicalTimeout(payload) {
 }
 
 function submitLocalAction(input) {
-  if (state.screen !== APP_SCREENS.game) return;
-  if (state.phase !== PHASES.choosingAction) return;
-  if (state.currentActor !== state.localSlot) return;
-  if (state.friend.pendingRequest) return;
+  const invalidFeedback = getInvalidActionFeedback(input);
+  if (invalidFeedback) {
+    showActionToast(invalidFeedback);
+    return;
+  }
 
   if (state.mode === "friend") {
     const actorSlot = state.currentActor;
@@ -2298,6 +2349,13 @@ function getConnectionBannerText() {
   return `Connected: ${net.connectedCount}/2 | You are ${role} | Room: ${roomId} | ${state.friend.connectionStatus}`;
 }
 
+function getActiveTurnSlot() {
+  if (state.screen !== APP_SCREENS.game) return null;
+  if (state.phase === PHASES.choosingAction) return state.currentActor;
+  if (state.phase === PHASES.awaitingResponse) return state.pendingResponder;
+  return null;
+}
+
 function renderAvatar(node, avatarId) {
   if (!node) return;
   const path = getAvatarPath(avatarId);
@@ -2314,6 +2372,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
 
   if (ownerSlot === state.localSlot) {
     node.classList.add(card.isReal ? "real-role" : "fake-role");
+    if (card.isReal) node.classList.add("real-role-highlight");
   } else {
     node.classList.add("opponent-card");
     if (card.confirmed) node.classList.add("opponent-confirmed");
@@ -2331,42 +2390,80 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
   node.appendChild(textFade);
 
   const meta = getRoleMeta(card.role);
+  const usesLeft = getRoleUsesLeft(ownerSlot, card.role);
+  const badgeRow = document.createElement("div");
+  badgeRow.className = "card-badge-row";
+  const badgeLeft = document.createElement("div");
+  badgeLeft.className = "card-badge-group card-badge-group-left";
+  const badgeRight = document.createElement("div");
+  badgeRight.className = "card-badge-group card-badge-group-right";
+  let hasBadge = false;
+
+  if (ownerSlot === state.localSlot && card.isReal) {
+    const realTag = document.createElement("span");
+    realTag.className = "card-badge card-status-tag card-real-tag";
+    realTag.textContent = "REAL";
+    badgeLeft.appendChild(realTag);
+    hasBadge = true;
+  }
+
+  if (ownerSlot !== state.localSlot && card.confirmed) {
+    const confirmedTag = document.createElement("span");
+    confirmedTag.className = "card-badge card-status-tag card-confirmed-tag";
+    confirmedTag.textContent = "CONFIRMED";
+    badgeLeft.appendChild(confirmedTag);
+    hasBadge = true;
+  }
 
   if (meta && meta.cost > 0) {
     const cost = document.createElement("span");
     cost.className = "card-badge card-cost";
     cost.textContent = String(meta.cost);
-    node.appendChild(cost);
+    badgeRight.appendChild(cost);
+    hasBadge = true;
   }
 
   if (meta && meta.passive) {
     const passive = document.createElement("span");
     passive.className = "card-badge card-passive";
     passive.textContent = "PASSIVE";
-    node.appendChild(passive);
+    badgeLeft.appendChild(passive);
+    hasBadge = true;
   }
 
-  const usesLeft = getRoleUsesLeft(ownerSlot, card.role);
   if (usesLeft !== null) {
     const uses = document.createElement("span");
     uses.className = "card-badge card-uses";
     uses.textContent = `USES ${usesLeft}`;
-    node.appendChild(uses);
+    badgeLeft.appendChild(uses);
+    hasBadge = true;
   }
+
+  if (hasBadge) {
+    badgeRow.appendChild(badgeLeft);
+    badgeRow.appendChild(badgeRight);
+    node.appendChild(badgeRow);
+  }
+
+  const textPanel = document.createElement("div");
+  textPanel.className = "card-text-panel";
 
   const label = document.createElement("p");
   label.className = "card-label";
   label.textContent = card.role;
-  node.appendChild(label);
+  textPanel.appendChild(label);
 
   const desc = document.createElement("p");
   desc.className = "card-desc";
   renderRoleDescription(desc, card.role);
-  node.appendChild(desc);
+  textPanel.appendChild(desc);
+  node.appendChild(textPanel);
 
   if (asButton && disabled) {
-    node.disabled = true;
+    node.setAttribute("aria-disabled", "true");
     node.classList.add("is-disabled");
+  } else if (asButton) {
+    node.setAttribute("aria-disabled", "false");
   }
 
   return node;
@@ -2473,7 +2570,11 @@ function updateUI() {
   ui.roundLabel.textContent = `ROUND ${Math.min(state.round, MATCH_SETTINGS.MAX_ROUNDS)}/${MATCH_SETTINGS.MAX_ROUNDS}`;
   ui.timerText.textContent = state.timer.mode ? `${state.timer.remaining}s` : "--";
   ui.turnIndicator.textContent = getTurnIndicatorText();
-  ui.currentActionText.textContent = state.currentActionText;
+  renderCurrentActionTypewriter(state.currentActionText);
+
+  const activeTurnSlot = getActiveTurnSlot();
+  ui.topPanel.classList.toggle("turn-active", activeTurnSlot === topSlot);
+  ui.bottomPanel.classList.toggle("turn-active", activeTurnSlot === bottomSlot);
 
   const canLocalAct =
     state.screen === APP_SCREENS.game &&
@@ -2481,8 +2582,13 @@ function updateUI() {
     state.currentActor === state.localSlot &&
     !state.friend.pendingRequest;
 
-  ui.interestBtn.disabled = !canLocalAct;
-  ui.strikeBtn.disabled = !canLocalAct || state.players[state.localSlot].gold < BASIC_ACTIONS.STRIKE.cost;
+  const canUseStrike = canLocalAct && state.players[state.localSlot].gold >= BASIC_ACTIONS.STRIKE.cost;
+  ui.interestBtn.disabled = false;
+  ui.strikeBtn.disabled = false;
+  ui.interestBtn.classList.toggle("is-disabled", !canLocalAct);
+  ui.strikeBtn.classList.toggle("is-disabled", !canUseStrike);
+  ui.interestBtn.setAttribute("aria-disabled", canLocalAct ? "false" : "true");
+  ui.strikeBtn.setAttribute("aria-disabled", canUseStrike ? "false" : "true");
 
   renderCardsForSlot(ui.topCards, topSlot, false);
   renderCardsForSlot(ui.bottomCards, bottomSlot, canLocalAct);
@@ -2593,6 +2699,68 @@ function showCopyToast(message) {
   }, 1500);
 }
 
+function showActionToast(message) {
+  if (!ui.actionToast || !message) return;
+  ui.actionToast.textContent = message;
+  ui.actionToast.classList.remove("hidden");
+  if (uiRuntime.actionToastTimerId) clearTimeout(uiRuntime.actionToastTimerId);
+  uiRuntime.actionToastTimerId = setTimeout(() => {
+    ui.actionToast.classList.add("hidden");
+    uiRuntime.actionToastTimerId = null;
+  }, UI_TIMINGS.actionToastMs);
+}
+
+function clearActionToast() {
+  if (uiRuntime.actionToastTimerId) {
+    clearTimeout(uiRuntime.actionToastTimerId);
+    uiRuntime.actionToastTimerId = null;
+  }
+  if (ui.actionToast) ui.actionToast.classList.add("hidden");
+}
+
+function stopCurrentActionTypewriter() {
+  if (uiRuntime.currentActionTypeTimerId) {
+    clearInterval(uiRuntime.currentActionTypeTimerId);
+    uiRuntime.currentActionTypeTimerId = null;
+  }
+}
+
+function renderCurrentActionTypewriter(text) {
+  if (!ui.currentActionText) return;
+  const nextText = String(text || "");
+
+  if (nextText === uiRuntime.lastActionText) {
+    if (ui.currentActionText.textContent !== nextText && !uiRuntime.currentActionTypeTimerId) {
+      ui.currentActionText.textContent = nextText;
+    }
+    return;
+  }
+
+  uiRuntime.lastActionText = nextText;
+  uiRuntime.currentActionTypeToken += 1;
+  const token = uiRuntime.currentActionTypeToken;
+  stopCurrentActionTypewriter();
+
+  if (!nextText) {
+    ui.currentActionText.textContent = "";
+    return;
+  }
+
+  let index = 0;
+  ui.currentActionText.textContent = "";
+  uiRuntime.currentActionTypeTimerId = setInterval(() => {
+    if (token !== uiRuntime.currentActionTypeToken) {
+      stopCurrentActionTypewriter();
+      return;
+    }
+    index += 1;
+    ui.currentActionText.textContent = nextText.slice(0, index);
+    if (index >= nextText.length) {
+      stopCurrentActionTypewriter();
+    }
+  }, UI_TIMINGS.currentActionTypeMs);
+}
+
 async function reconnectFriendRoom() {
   if (!state.friend.roomId || !state.friend.role) return;
   if (state.friend.role === "guest") {
@@ -2606,7 +2774,7 @@ function onBottomCardsClick(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
   const button = target.closest("button[data-card-index]");
-  if (!(button instanceof HTMLButtonElement) || button.disabled) return;
+  if (!(button instanceof HTMLButtonElement)) return;
   const cardIndex = Number(button.dataset.cardIndex);
   if (Number.isNaN(cardIndex)) return;
   submitLocalAction({ kind: "card", cardIndex });
@@ -2845,6 +3013,7 @@ function cacheElements() {
   ui.rulesModal = document.getElementById("rulesModal");
   ui.rulesCloseBtn = document.getElementById("rulesCloseBtn");
   ui.copyToast = document.getElementById("copyToast");
+  ui.actionToast = document.getElementById("actionToast");
 }
 
 function exposeSupabaseTest() {
