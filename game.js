@@ -101,22 +101,62 @@ const ASSET_VERSION = "3";
 
 const UI_TIMINGS = Object.freeze({
   actionToastMs: 1800,
-  currentActionTypeMs: 25
+  currentActionTypeMs: 25,
+  homeTipsRotateMs: 5000
 });
+
+const HOME_TIPS = Object.freeze([
+  "Bluff early to learn how your opponent reacts.",
+  "Save gold for high-impact turns.",
+  "If they hesitate, they might be lying.",
+  "Use reveals to reduce uncertainty, not to show off.",
+  "Track which cards are REAL/FAKE as the match evolves.",
+  "Don’t accuse on impulse—accuse when the risk is worth it.",
+  "Swap smart in the opening: keep flexible options.",
+  "Pressure low HP opponents—force tough decisions.",
+  "Sometimes ACCEPT is the best punish.",
+  "Win the mind game, not just the numbers."
+]);
+
+const BOT_IDENTITIES = Object.freeze([
+  Object.freeze({ name: "Hikaru", avatarId: "avatar-2" }),
+  Object.freeze({ name: "Danny", avatarId: "avatar-1" }),
+  Object.freeze({ name: "MrBeast", avatarId: "avatar-3" })
+]);
+
+const RULES_ROLE_DETAILS = Object.freeze([
+  Object.freeze({ role: "SIREN", text: "Skip opponent next action" }),
+  Object.freeze({ role: "DWARF", text: "Shield next damage (1 Gold)" }),
+  Object.freeze({ role: "KNIGHT", text: "2 damage (2 Gold)" }),
+  Object.freeze({ role: "GOBLIN", text: "Steal 1 Gold (max 3)" }),
+  Object.freeze({ role: "ENT", text: "Heal 2 HP (2 Gold)" }),
+  Object.freeze({ role: "PIRATE", text: "1 damage +1 Gold (max 2)" }),
+  Object.freeze({ role: "ELF", text: "Passive +2 Gold on catch lie" }),
+  Object.freeze({ role: "SCIENTIST", text: "+1 Gold + reveal one unknown card (max 2)" }),
+  Object.freeze({ role: "JOKER", text: "1 damage (1 Gold), then transforms" }),
+  Object.freeze({ role: "BERSERK", text: "Self -1 HP, enemy -2 HP" }),
+  Object.freeze({ role: "BANKER", text: "Activate +1 Gold / round buff (2 Gold)" }),
+  Object.freeze({ role: "ANGEL", text: "Swap HP and Gold (1 Gold, max 1)" }),
+  Object.freeze({ role: "VALK", text: "Enemy -1 HP, self +1 HP (3 Gold)" }),
+  Object.freeze({ role: "APPRENTICE", label: "ADEPT", text: "X damage, cost X+1, scales each round (cap 5/6)" })
+]);
 
 const ui = {};
 const uiRuntime = {
   actionToastTimerId: null,
   currentActionTypeTimerId: null,
   currentActionTypeToken: 0,
-  lastActionText: ""
+  lastActionText: "",
+  homeTipTimerId: null,
+  homeTipFadeTimerId: null
 };
 const modalState = { activeModal: null };
 
 const state = {
   screen: APP_SCREENS.home,
   mode: null,
-  profile: { name: "Player", avatarId: "avatar-1", level: 1 },
+  profile: { name: "Player", avatarId: "avatar-1", level: 1, ranking: 1000 },
+  home: { tipIndex: 0 },
   friend: {
     roomId: "",
     role: null,
@@ -1116,6 +1156,101 @@ function getRoleDisplayName(role) {
   return String(role || "");
 }
 
+function chooseBotIdentity() {
+  const index = Math.floor(Math.random() * BOT_IDENTITIES.length);
+  return BOT_IDENTITIES[index] || BOT_IDENTITIES[0];
+}
+
+function getHomeTip(index) {
+  if (HOME_TIPS.length === 0) return "";
+  const normalized = ((Number(index) || 0) % HOME_TIPS.length + HOME_TIPS.length) % HOME_TIPS.length;
+  return HOME_TIPS[normalized];
+}
+
+function setHomeTip(index, animate = true) {
+  if (!ui.homeTipText) return;
+  if (HOME_TIPS.length === 0) return;
+  const normalized = ((Number(index) || 0) % HOME_TIPS.length + HOME_TIPS.length) % HOME_TIPS.length;
+  state.home.tipIndex = normalized;
+
+  if (ui.homeTipDots) {
+    const dots = ui.homeTipDots.querySelectorAll(".home-tip-dot");
+    dots.forEach((dot, dotIndex) => {
+      const active = dotIndex === normalized;
+      dot.classList.toggle("is-active", active);
+      dot.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
+  const nextText = getHomeTip(normalized);
+  if (!animate) {
+    ui.homeTipText.textContent = nextText;
+    ui.homeTipText.classList.remove("is-animating");
+    return;
+  }
+
+  ui.homeTipText.classList.add("is-animating");
+  if (uiRuntime.homeTipFadeTimerId) clearTimeout(uiRuntime.homeTipFadeTimerId);
+  uiRuntime.homeTipFadeTimerId = setTimeout(() => {
+    ui.homeTipText.textContent = nextText;
+    ui.homeTipText.classList.remove("is-animating");
+    uiRuntime.homeTipFadeTimerId = null;
+  }, 170);
+}
+
+function advanceHomeTip() {
+  setHomeTip(state.home.tipIndex + 1, true);
+}
+
+function startHomeTipsCarousel() {
+  if (uiRuntime.homeTipTimerId) clearInterval(uiRuntime.homeTipTimerId);
+  uiRuntime.homeTipTimerId = setInterval(() => {
+    if (state.screen !== APP_SCREENS.home) return;
+    advanceHomeTip();
+  }, UI_TIMINGS.homeTipsRotateMs);
+}
+
+function renderHomeTipDots() {
+  if (!ui.homeTipDots) return;
+  ui.homeTipDots.innerHTML = "";
+  HOME_TIPS.forEach((_, index) => {
+    const dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "home-tip-dot";
+    dot.setAttribute("aria-label", `Show tip ${index + 1}`);
+    dot.addEventListener("click", () => {
+      setHomeTip(index, true);
+    });
+    ui.homeTipDots.appendChild(dot);
+  });
+}
+
+function renderRulesRoleList() {
+  if (!ui.rulesRoleList) return;
+  ui.rulesRoleList.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+
+  RULES_ROLE_DETAILS.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "rules-role-item";
+
+    const thumb = document.createElement("img");
+    thumb.className = "rules-role-thumb";
+    thumb.src = getRoleImagePath(entry.role);
+    thumb.alt = `${entry.label || getRoleDisplayName(entry.role)} card`;
+
+    const text = document.createElement("p");
+    text.className = "rules-role-text";
+    text.textContent = `${entry.label || getRoleDisplayName(entry.role)} - ${entry.text}`;
+
+    row.appendChild(thumb);
+    row.appendChild(text);
+    fragment.appendChild(row);
+  });
+
+  ui.rulesRoleList.appendChild(fragment);
+}
+
 function getPlayableRoles() {
   return Object.keys(ROLE_CONFIG).filter((role) => !ROLE_CONFIG[role].passive);
 }
@@ -1496,7 +1631,8 @@ async function backToMenu() {
     name: safePlayerName(state.profile.name),
     avatarId: normalizeAvatarId(state.profile.avatarId)
   };
-  state.slots.bot = { id: "bot-ai", name: "Bot", avatarId: "avatar-bot" };
+  const botIdentity = chooseBotIdentity();
+  state.slots.bot = { id: "bot-ai", name: botIdentity.name, avatarId: botIdentity.avatarId };
   state.localSlot = "human";
 
   setRoomIdInUrl("");
@@ -2167,6 +2303,10 @@ function concludeMatch(winnerKey, reason) {
   if (state.phase === PHASES.matchEnd) return;
   clearTimer();
   cancelResolutionQueue();
+  if (winnerKey === "human" || winnerKey === "bot") {
+    const delta = winnerKey === state.localSlot ? 50 : -50;
+    state.profile.ranking = Math.max(0, state.profile.ranking + delta);
+  }
   state.phase = PHASES.matchEnd;
   state.screen = APP_SCREENS.result;
   state.matchWinner = winnerKey;
@@ -3139,7 +3279,7 @@ function submitLocalResponse(choice) {
 function getTurnIndicatorText() {
   if (state.screen !== APP_SCREENS.game) return "";
 
-  if (state.phase === PHASES.draft) return "Select cards to change (0-4) then press ACCEPT";
+  if (state.phase === PHASES.draft) return "Select cards to change (0–4) then press ACCEPT";
   if (state.phase === PHASES.awaitingDraftOpponent) return "Waiting for opponent to press ACCEPT...";
   if (state.phase === PHASES.draftReveal) return "Applying swaps...";
   if (state.phase === PHASES.gameStart) return "Preparing first turn...";
@@ -3390,6 +3530,8 @@ function updateUI() {
   ui.playerNameInput.value = safePlayerName(state.profile.name);
   ui.avatarPreviewLabel.textContent = getAvatarMeta(state.profile.avatarId).label;
   renderAvatar(ui.avatarPreviewArt, state.profile.avatarId);
+  if (ui.homeLevelValue) ui.homeLevelValue.textContent = String(state.profile.level);
+  if (ui.homeRankingValue) ui.homeRankingValue.textContent = String(state.profile.ranking);
 
   const showFriendBanner = state.mode === "friend" && state.screen === APP_SCREENS.game;
   ui.friendBanner.classList.toggle("hidden", !showFriendBanner);
@@ -3433,6 +3575,12 @@ function updateUI() {
   const topSlot = opponentOf(state.localSlot);
   const bottomSlot = state.localSlot;
   const draftMode = isDraftPhase();
+  const localDraftPending =
+    isDraftSelectionPhase() &&
+    Boolean(state.draft) &&
+    Boolean(state.localSlot) &&
+    !Boolean(state.draft.accepted[state.localSlot]);
+  const hideDraftOpponentPanel = draftMode && localDraftPending;
 
   ui.topNameText.textContent = slotName(topSlot);
   ui.bottomNameText.textContent = slotName(bottomSlot);
@@ -3441,18 +3589,21 @@ function updateUI() {
 
   renderAvatar(ui.topAvatar, state.slots[topSlot].avatarId);
   renderAvatar(ui.bottomAvatar, state.slots[bottomSlot].avatarId);
+  ui.topPanel.classList.toggle("draft-opponent-hidden", hideDraftOpponentPanel);
+  ui.topPanel.dataset.hiddenText =
+    hideDraftOpponentPanel && state.mode === "friend" && net.connectedCount < 2
+      ? "HIDDEN\nWaiting for opponent..."
+      : hideDraftOpponentPanel
+        ? "HIDDEN\nReveal after you press ACCEPT"
+        : "";
 
   ui.appRoot.classList.toggle("draft-open", draftMode);
+  ui.appRoot.classList.toggle("draft-local-pending", hideDraftOpponentPanel);
   ui.roundLabel.textContent = draftMode
     ? "DRAFT PHASE"
     : `ROUND ${Math.min(state.round, MATCH_SETTINGS.MAX_ROUNDS)}/${MATCH_SETTINGS.MAX_ROUNDS}`;
   ui.timerText.textContent = state.timer.mode ? `${state.timer.remaining}s` : "--";
   ui.turnIndicator.textContent = getTurnIndicatorText();
-  const localDraftPending =
-    isDraftSelectionPhase() &&
-    Boolean(state.draft) &&
-    Boolean(state.localSlot) &&
-    !Boolean(state.draft.accepted[state.localSlot]);
   ui.turnIndicator.classList.toggle("draft-instruction", localDraftPending);
   renderCurrentActionTypewriter(state.currentActionText);
 
@@ -3858,6 +4009,10 @@ function cacheElements() {
   ui.resultScreen = document.getElementById("resultScreen");
 
   ui.homePlayBtn = document.getElementById("homePlayBtn");
+  ui.homeLevelValue = document.getElementById("homeLevelValue");
+  ui.homeRankingValue = document.getElementById("homeRankingValue");
+  ui.homeTipText = document.getElementById("homeTipText");
+  ui.homeTipDots = document.getElementById("homeTipDots");
   ui.playerNameInput = document.getElementById("playerNameInput");
   ui.avatarPreviewBtn = document.getElementById("avatarPreviewBtn");
   ui.avatarPreviewArt = document.getElementById("avatarPreviewArt");
@@ -3932,6 +4087,7 @@ function cacheElements() {
 
   ui.rulesModal = document.getElementById("rulesModal");
   ui.rulesCloseBtn = document.getElementById("rulesCloseBtn");
+  ui.rulesRoleList = document.getElementById("rulesRoleList");
   ui.copyToast = document.getElementById("copyToast");
   ui.actionToast = document.getElementById("actionToast");
 }
@@ -4016,6 +4172,10 @@ async function init() {
   cacheElements();
   applyAssetCssVariables();
   renderAvatarChoices();
+  renderRulesRoleList();
+  renderHomeTipDots();
+  setHomeTip(state.home.tipIndex, false);
+  startHomeTipsCarousel();
   setActionDescriptions();
   exposeSupabaseTest();
   bindEvents();
