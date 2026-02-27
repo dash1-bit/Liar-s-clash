@@ -114,6 +114,7 @@ body {
   margin: 0;
   font-size: clamp(1rem, 3.4vw, 1.28rem);
   font-weight: 900;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -176,7 +177,12 @@ body {
   margin: 0;
   font-size: var(--fs-xl);
   letter-spacing: 0.03em;
-  text-align: left;
+  text-align: center;
+}
+
+.app-title--hero {
+  font-size: clamp(1.72rem, 6.4vw, 2.28rem);
+  font-weight: 900;
 }
 
 .title-with-logo {
@@ -1202,7 +1208,7 @@ body {
 }
 
 .result-game-name {
-  text-align: left;
+  text-align: center;
   font-size: clamp(1.26rem, 4.6vw, 1.92rem);
 }
 
@@ -1358,6 +1364,133 @@ body {
   padding: 12px;
 }
 
+.tutorial-modal {
+  padding: 0;
+}
+
+.tutorial-shell {
+  width: min(100vw, 430px);
+  height: 100dvh;
+  border-left: 1px solid rgba(132, 127, 118, 0.35);
+  border-right: 1px solid rgba(132, 127, 118, 0.35);
+  background: linear-gradient(180deg, #232220 0%, #1a1918 100%);
+  padding: calc(var(--pad) + env(safe-area-inset-top)) var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 10px;
+}
+
+.tutorial-title {
+  text-align: center;
+  font-size: clamp(1.2rem, 4vw, 1.66rem);
+}
+
+.tutorial-step-text {
+  margin: 0;
+  text-align: center;
+  color: #f2f2ef;
+  font-size: var(--fs-md);
+  font-weight: 800;
+  line-height: 1.34;
+  min-height: 2.7em;
+}
+
+.tutorial-demo {
+  border: 1px solid rgba(118, 113, 105, 0.48);
+  border-radius: 12px;
+  background: rgba(37, 35, 32, 0.9);
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+  opacity: 0.55;
+  transform: scale(0.988);
+  transition: border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.tutorial-demo-title {
+  margin: 0;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  text-align: center;
+  font-weight: 900;
+}
+
+.tutorial-mini-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tutorial-mini-card {
+  min-height: clamp(58px, 10vh, 74px);
+  cursor: default;
+  pointer-events: none;
+}
+
+.tutorial-mini-card .card-label {
+  font-size: clamp(0.52rem, 1.6vw, 0.62rem);
+}
+
+.tutorial-decision-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tutorial-response-btn {
+  min-height: clamp(44px, 8.2vh, 56px);
+  border: 1px solid rgba(119, 114, 106, 0.56);
+  border-radius: 10px;
+  background: rgba(26, 25, 23, 0.95);
+  font-size: var(--fs-sm);
+  pointer-events: none;
+}
+
+.tutorial-outcome-demo {
+  align-content: start;
+}
+
+.tutorial-outcome-line {
+  margin: 0;
+  color: #f3f3f0;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tutorial-outcome-line::before {
+  content: ">";
+  color: var(--accent-2);
+  font-weight: 900;
+}
+
+.tutorial-next-btn {
+  width: 100%;
+}
+
+.tutorial-modal[data-step="cards"] .tutorial-demo-cards,
+.tutorial-modal[data-step="decision"] .tutorial-decision-demo,
+.tutorial-modal[data-step="outcome"] .tutorial-outcome-demo {
+  opacity: 1;
+  transform: scale(1);
+  border-color: rgba(129, 182, 76, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(129, 182, 76, 0.42),
+    0 0 18px rgba(129, 182, 76, 0.25);
+}
+
+.tutorial-modal[data-step="cards"] .tutorial-demo-cards {
+  animation: tutorialPulse 1.4s ease-in-out infinite;
+}
+
+.tutorial-modal[data-step="decision"] .tutorial-decision-demo .tutorial-response-btn {
+  border-color: rgba(129, 182, 76, 0.78);
+}
+
 .premium-modal {
   padding: 0;
 }
@@ -1378,10 +1511,10 @@ body {
 .premium-topbar {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 8px;
   position: relative;
-  padding-right: calc(var(--tap) + 8px);
+  padding: 0 calc(var(--tap) + 8px) 0 0;
 }
 
 .premium-title-wrap {
@@ -1396,6 +1529,7 @@ body {
 .premium-title {
   margin: 0;
   font-size: clamp(1.12rem, 3.5vw, 1.46rem);
+  text-align: center;
 }
 
 .premium-hero {
@@ -1521,7 +1655,7 @@ body {
 }
 
 .rules-modal-title {
-  text-align: left;
+  text-align: center;
   font-size: clamp(1.02rem, 3.4vw, 1.28rem);
 }
 
@@ -1772,6 +1906,24 @@ body {
     box-shadow: 0 0 0 0 rgba(129, 182, 76, 0.14);
     background: rgba(23, 22, 20, 0.98);
     border-top-color: #0f0e0d;
+  }
+}
+
+@keyframes tutorialPulse {
+  0% {
+    box-shadow:
+      0 0 0 1px rgba(129, 182, 76, 0.36),
+      0 0 12px rgba(129, 182, 76, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(129, 182, 76, 0.54),
+      0 0 20px rgba(129, 182, 76, 0.34);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(129, 182, 76, 0.36),
+      0 0 12px rgba(129, 182, 76, 0.2);
   }
 }
 

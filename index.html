@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Liar's Clash</title>
+  <title>Gambit Liar's</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
@@ -13,10 +13,7 @@
   <div id="appRoot" class="app-root">
     <section id="homeScreen" class="screen active" aria-label="Home">
       <div class="home-hero">
-        <div class="title-with-logo">
-          <img id="homeLogoImg" class="gameLogo title-logo hidden" alt="Liar's Clash logo" />
-          <h1 class="app-title">Liar's Clash</h1>
-        </div>
+        <h1 class="app-title app-title--hero">Gambit Liar's</h1>
         <p class="home-tagline">Win the mind game.</p>
       </div>
       <div class="screen-card home-card">
@@ -48,17 +45,14 @@
         <button id="modeBackBtn" class="btn btn-back" type="button">Back to Menu</button>
       </div>
       <div class="screen-card mode-card">
-        <div class="title-with-logo mode-title-row">
-          <img id="modeLogoImg" class="gameLogo title-logo hidden" alt="Liar's Clash logo" />
-          <h2 class="section-title mode-game-title">Liar's Clash</h2>
-        </div>
+        <h2 class="section-title mode-game-title">Gambit Liar's</h2>
         <p class="helper-text mode-subtitle">Choose Mode</p>
         <button id="playBotBtn" class="btn mode-btn" type="button">Play vs Bot</button>
         <button id="playFriendBtn" class="btn mode-btn" type="button">Play vs a Friend</button>
         <button id="tournamentsBtn" class="btn mode-btn mode-btn-disabled" type="button" aria-disabled="true">Tournaments</button>
         <div class="mode-helper">
-          <p class="helper-text mode-helper-text">First match? Learn the basics.</p>
-          <button id="modeOpenRulesBtn" class="btn btn-secondary mode-helper-btn" type="button">Open Rules</button>
+          <p class="helper-text mode-helper-text">First time? Learn in 20 seconds.</p>
+          <button id="startTutorialBtn" class="btn btn-secondary mode-helper-btn" type="button">Start Tutorial</button>
         </div>
       </div>
     </section>
@@ -111,13 +105,10 @@
       </div>
     </section>
 
-    <section id="gameScreen" class="screen" aria-label="Liar's Clash Match">
+    <section id="gameScreen" class="screen" aria-label="Gambit Liar's Match">
       <div class="top-row match-top-row">
         <button id="gameBackBtn" class="btn btn-back" type="button">Back to Menu</button>
-        <div class="title-with-logo match-brand" aria-hidden="true">
-          <img id="matchLogoImg" class="gameLogo title-logo hidden" alt="Liar's Clash logo" />
-          <h2 class="match-brand-title">Liar's Clash</h2>
-        </div>
+        <h2 class="match-brand-title">Gambit Liar's</h2>
         <button id="rulesBtn" class="btn btn-secondary" type="button" aria-label="Open quick rules">Rules</button>
       </div>
 
@@ -173,9 +164,8 @@
 
     <section id="resultScreen" class="screen" aria-label="Match Result">
       <div class="screen-card result-card result-summary-card">
-        <header class="result-brand title-with-logo title-with-logo--result">
-          <img id="resultLogoImg" class="gameLogo result-logo hidden" alt="Liar's Clash logo" />
-          <h2 class="section-title result-game-name">Liar's Clash</h2>
+        <header class="result-brand">
+          <h2 class="section-title result-game-name">Gambit Liar's</h2>
         </header>
         <div class="result-duel">
           <p id="resultDuelNames" class="result-duel-names">Player vs Opponent</p>
@@ -225,6 +215,39 @@
   <p id="copyToast" class="copy-toast hidden" role="status" aria-live="polite">Copied!</p>
   <p id="actionToast" class="action-toast hidden" role="status" aria-live="polite"></p>
 
+  <section id="tutorialModal" class="modal-overlay tutorial-modal hidden" role="dialog" aria-modal="true" aria-label="Quick tutorial">
+    <div class="tutorial-shell">
+      <h2 class="section-title tutorial-title">Gambit Liar's Tutorial</h2>
+      <p id="tutorialStepText" class="tutorial-step-text">Play a card. You can tell the truth... or bluff.</p>
+
+      <div class="tutorial-demo tutorial-demo-cards">
+        <p class="tutorial-demo-title">Card Row</p>
+        <div class="tutorial-mini-cards">
+          <div class="role-card tutorial-mini-card"><span class="card-label">SIREN</span></div>
+          <div class="role-card tutorial-mini-card"><span class="card-label">KNIGHT</span></div>
+          <div class="role-card tutorial-mini-card"><span class="card-label">GOBLIN</span></div>
+          <div class="role-card tutorial-mini-card"><span class="card-label">ELF</span></div>
+        </div>
+      </div>
+
+      <div class="tutorial-demo tutorial-decision-demo">
+        <p class="tutorial-demo-title">Decision</p>
+        <div class="tutorial-decision-row">
+          <button class="response-btn tutorial-response-btn" type="button">ACCEPT</button>
+          <button class="response-btn tutorial-response-btn" type="button">YOU'RE LYING!</button>
+        </div>
+      </div>
+
+      <div class="tutorial-demo tutorial-outcome-demo">
+        <p class="tutorial-demo-title">Outcomes</p>
+        <p class="tutorial-outcome-line">YOU'RE LYING! -> Liar -2 HP</p>
+        <p class="tutorial-outcome-line">Wrong accuse -> Accuser -1 HP</p>
+      </div>
+
+      <button id="tutorialNextBtn" class="btn mode-btn tutorial-next-btn" type="button">Next</button>
+    </div>
+  </section>
+
   <section id="avatarModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Select avatar">
     <div class="modal-card">
       <button id="avatarModalCloseBtn" class="modal-close-btn" type="button" aria-label="Close avatar selector">X</button>
@@ -249,12 +272,9 @@
   <section id="rulesModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Quick rules">
     <div class="modal-card">
       <button id="rulesCloseBtn" class="modal-close-btn" type="button" aria-label="Close quick rules">X</button>
-      <div class="title-with-logo rules-title-row">
-        <img id="rulesLogoImg" class="gameLogo title-logo hidden" alt="Liar's Clash logo" />
-        <h2 class="section-title rules-modal-title">Liar's Clash</h2>
-      </div>
+      <h2 class="section-title rules-modal-title">Gambit Liar's</h2>
       <p class="helper-text rules-subtitle">Quick Rules</p>
-      <pre class="rules-text">=== LIAR'S CLASH - QUICK RULES ===
+      <pre class="rules-text">=== GAMBIT LIAR'S - QUICK RULES ===
 
 Goal:
 Reduce opponent HP to 0.
@@ -295,10 +315,7 @@ STRIKE -> 1 damage (2 Gold)
   <section id="premiumModal" class="modal-overlay premium-modal hidden" role="dialog" aria-modal="true" aria-label="Premium">
     <div class="premium-shell">
       <header class="premium-topbar">
-        <div class="title-with-logo premium-title-wrap">
-          <img id="premiumLogoImg" class="gameLogo title-logo hidden" alt="Liar's Clash logo" />
-          <h2 class="premium-title">Liar's Clash Premium</h2>
-        </div>
+        <h2 class="premium-title">Gambit Liar's Premium</h2>
         <button id="premiumCloseBtn" class="modal-close-btn premium-close-btn" type="button" aria-label="Close premium modal">X</button>
       </header>
       <section class="premium-hero">

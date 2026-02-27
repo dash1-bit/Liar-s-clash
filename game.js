@@ -87,8 +87,7 @@ const ASSET_MAP = Object.freeze({
     shield: "./Recursos/Shield.png",
     sword: "./Recursos/Sword.png"
   }),
-  badgePath: "./Recursos/Badge.png",
-  logoPath: "./Recursos/logo.png"
+  badgePath: "./Recursos/Badge.png"
 });
 
 const AVATAR_PRESETS = Object.freeze({
@@ -118,6 +117,29 @@ const HOME_TIPS = Object.freeze([
   "Pressure low HP opponents\u2014force tough decisions.",
   "Sometimes ACCEPT is the best punish.",
   "Win the mind game, not just the numbers."
+]);
+
+const TUTORIAL_STEPS = Object.freeze([
+  Object.freeze({
+    text: "Play a card. You can tell the truth... or bluff.",
+    button: "Next",
+    focus: "cards"
+  }),
+  Object.freeze({
+    text: "Your opponent chooses ACCEPT or YOU'RE LYING!",
+    button: "Next",
+    focus: "decision"
+  }),
+  Object.freeze({
+    text: "If they catch a lie, you lose 2 HP. If they're wrong, they lose 1 HP.",
+    button: "Next",
+    focus: "outcome"
+  }),
+  Object.freeze({
+    text: "Reduce HP or outscore with Gold after 10 rounds.",
+    button: "Got it",
+    focus: "none"
+  })
 ]);
 
 const BOT_IDENTITIES = Object.freeze([
@@ -150,6 +172,7 @@ const uiRuntime = {
   currentActionPauseTimerId: null,
   currentActionTypeToken: 0,
   lastActionText: "",
+  tutorialStepIndex: 0,
   homeTipTimerId: null,
   homeTipFadeTimerId: null
 };
@@ -822,36 +845,19 @@ function getRoleImagePath(role) {
   return withAssetVersion(ASSET_MAP.roleImagePaths[role] || "");
 }
 
-function getLogoPath() {
-  return withAssetVersion(ASSET_MAP.logoPath || "");
+function getChoiceLabel(choice) {
+  return choice === "CHALLENGE" ? "YOU'RE LYING!" : "ACCEPT";
 }
 
-function bindLogoImageNode(node) {
-  if (!node || node.dataset.logoBound === "1") return;
-  node.dataset.logoBound = "1";
-  node.addEventListener("load", () => {
-    node.classList.remove("hidden");
-  });
-  node.addEventListener("error", () => {
-    node.classList.add("hidden");
-  });
+function formatDecisionText(actorSlot, choice) {
+  const label = getChoiceLabel(choice);
+  if (actorSlot === state.localSlot) return `You chose ${label}`;
+  return `${slotName(actorSlot)} chose ${label}`;
 }
 
-function refreshLogoImages() {
-  const logoPath = getLogoPath();
-  const nodes = [ui.homeLogoImg, ui.modeLogoImg, ui.matchLogoImg, ui.rulesLogoImg, ui.resultLogoImg, ui.premiumLogoImg];
-  nodes.forEach((node) => {
-    if (!node) return;
-    bindLogoImageNode(node);
-    if (!logoPath) {
-      node.classList.add("hidden");
-      return;
-    }
-    if (node.dataset.src !== logoPath) {
-      node.dataset.src = logoPath;
-      node.src = logoPath;
-    }
-  });
+function formatChallengeOutcome(isReal, actor, challenger) {
+  if (isReal) return `Wrong accuse -> ${slotName(challenger)} -1 HP`;
+  return `Lie caught -> ${slotName(actor)} -2 HP`;
 }
 
 function createInlineIcon(iconKey, className = "inline-icon") {
@@ -1900,7 +1906,7 @@ function applyFriendStart(payload) {
     }, 260);
   }
 
-  setCurrentAction("Draft phase: select up to 4 cards to swap and tap ACCEPT.");
+  setCurrentAction("Select 0-4 cards, then ACCEPT.");
   startDraftTimer();
   updateUI();
 }
@@ -2057,7 +2063,7 @@ function applyDraftFinalStart(payload) {
 
   state.phase = PHASES.gameStart;
   state.screen = APP_SCREENS.game;
-  setCurrentAction("Draft complete. Match started.");
+  setCurrentAction("Draft done. Match start.");
   updateUI();
   setTimeout(() => beginTurn(), 220);
 }
@@ -2130,7 +2136,7 @@ function handleDraftTimeout() {
     }
 
     if (!state.draft.accepted[state.localSlot]) {
-      setCurrentAction("Draft timer expired. Waiting for host...");
+      setCurrentAction("Draft timer ended. Waiting host.");
       void submitLocalDraftAccept(true);
     }
     return;
@@ -2364,11 +2370,11 @@ function concludeMatchByHp() {
   const b = state.players.bot.hp;
   if (h > 0 && b > 0) return false;
   if (h <= 0 && b <= 0) {
-    concludeMatch("draw", "Both players reached 0 HP.");
+    concludeMatch("draw", "Both reached 0 HP.");
   } else if (h <= 0) {
-    concludeMatch("bot", `${slotLabel("bot")} reduced ${slotLabel("human")} HP to 0.`);
+    concludeMatch("bot", `${slotName("bot")} wins by HP.`);
   } else {
-    concludeMatch("human", `${slotLabel("human")} reduced ${slotLabel("bot")} HP to 0.`);
+    concludeMatch("human", `${slotName("human")} wins by HP.`);
   }
   return true;
 }
@@ -2435,7 +2441,7 @@ function beginTurn() {
   const actorState = state.players[actor];
   if (actorState.blockedActions > 0) {
     actorState.blockedActions -= 1;
-    setCurrentAction(`${slotLabel(actor)} loses action (SIREN skip).`);
+    setCurrentAction(`${slotName(actor)} skipped (SIREN).`);
     advanceToNextAction(460);
     return;
   }
@@ -2486,16 +2492,16 @@ function handleActionTimeout(actor) {
         }
       );
     } else {
-      setCurrentAction("Timer expired. Waiting for host...");
+      setCurrentAction("Timer ended. Waiting host.");
     }
     return;
   }
 
   if (canPlayBasic(actor, "INTEREST")) {
-    setCurrentAction(`${slotLabel(actor)} timer expired. Auto INTEREST.`);
+    setCurrentAction(`${slotName(actor)} timeout -> INTEREST`);
     playAction("INTEREST");
   } else {
-    setCurrentAction(`${slotLabel(actor)} timer expired. No legal action.`);
+    setCurrentAction(`${slotName(actor)} timeout -> no action`);
     advanceToNextAction();
   }
 }
@@ -2531,7 +2537,7 @@ function normalizeActionInput(actor, input) {
   if (!meta) return null;
 
   if (meta.passive) {
-    setCurrentAction(`${slotLabel(actor)} tapped ${card.role}. ${card.role} is passive.`);
+    setCurrentAction(`${slotName(actor)} played ${card.role} (passive)`);
     return null;
   }
 
@@ -2551,13 +2557,13 @@ function normalizeActionInput(actor, input) {
 
 function isActionLegal(actor, action) {
   const player = state.players[actor];
-  if (action.cost > player.gold) return { ok: false, reason: `${slotLabel(actor)} cannot afford ${action.label}.` };
-  if (action.role && !canUseRoleByUses(actor, action.role)) return { ok: false, reason: `${action.role} has no uses left.` };
+  if (action.cost > player.gold) return { ok: false, reason: `Not enough Gold for ${action.label}.` };
+  if (action.role && !canUseRoleByUses(actor, action.role)) return { ok: false, reason: `${action.label} has no uses left.` };
   return { ok: true };
 }
 
 function formatActionText(actor, action) {
-  return `${slotName(actor)} played ${action.label} (${action.description})`;
+  return `${slotName(actor)} played ${action.label}`;
 }
 
 function runResolutionAfterDelay(applyFn) {
@@ -2674,12 +2680,12 @@ function handleResponseTimeout(responder) {
         }
       );
     } else {
-      setCurrentAction("Response timer expired. Waiting for host...");
+      setCurrentAction("Response timer ended. Waiting host.");
     }
     return;
   }
 
-  setCurrentAction("Response timer expired. Auto ACCEPT.");
+  setCurrentAction("Timeout -> ACCEPT");
   clearPendingClaim();
   resolveAccept();
 }
@@ -2713,7 +2719,7 @@ function resolveAccept() {
   if (!action) return;
 
   if (typeof action.cardIndex === "number") markRoleReveal(action.actor, action.cardIndex);
-  setCurrentAction(`ACCEPTED. ${slotName(action.actor)} resolves ${action.label || getRoleDisplayName(action.role)}.`);
+  setCurrentAction(formatDecisionText(state.pendingResponder || opponentOf(action.actor), "ACCEPT"));
 
   runResolutionAfterDelay(() => {
     const pending = state.pendingAction;
@@ -2740,15 +2746,7 @@ function resolveChallenge() {
   markRoleReveal(actor, action.cardIndex, isReal ? "REAL" : "FAKE");
   state.pendingChallengeResult = { actor, challenger, role: action.role, isReal };
 
-  if (isReal) {
-    setCurrentAction(
-      `${slotName(challenger)} called YOU'RE LYING!, but ${slotName(actor)} is verified REAL. ${slotName(challenger)} loses 1 HP.`
-    );
-  } else {
-    setCurrentAction(
-      `${slotName(challenger)} called YOU'RE LYING!, and ${slotName(actor)} is verified FAKE. ${slotName(actor)} loses 2 HP.`
-    );
-  }
+  setCurrentAction(formatChallengeOutcome(isReal, actor, challenger));
 
   runResolutionAfterDelay(() => {
     const pending = state.pendingAction;
@@ -2813,7 +2811,7 @@ function applyEffect(action) {
         const revealed = revealCardVerification(target, revealIndex, "SCIENTIST");
         if (revealed) {
           const status = revealed.isReal ? "REAL" : "FAKE";
-          setCurrentAction(`${slotName(actor)} revealed ${slotName(target)} ${getRoleDisplayName(revealed.role)}: ${status}.`);
+          setCurrentAction(`Reveal ${status} ${getRoleDisplayName(revealed.role)}`);
         }
       }
       break;
@@ -2822,7 +2820,7 @@ function applyEffect(action) {
       applyDamage(target, 1, "JOKER");
       const transformedInto = replaceJokerCard(actor, action.cardIndex);
       if (transformedInto) {
-        setCurrentAction(`${slotName(actor)} transformed JOKER into ${getRoleDisplayName(transformedInto)}.`);
+        setCurrentAction(`JOKER -> ${getRoleDisplayName(transformedInto)}`);
       }
       break;
     }
@@ -2832,7 +2830,7 @@ function applyEffect(action) {
       break;
     case "BANKER":
       state.players[actor].bankerBuff = true;
-      setCurrentAction(`${slotName(actor)} activated BANKER: +1 Gold each round.`);
+      setCurrentAction("+1 Gold each round");
       break;
     case "ANGEL": {
       const actorState = state.players[actor];
@@ -3211,14 +3209,14 @@ function applyCanonicalTimeout(payload) {
 
   if (payload.phase === "action") {
     if (state.phase !== PHASES.choosingAction || payload.actorSlot !== state.currentActor) return;
-    setCurrentAction(`${slotLabel(payload.actorSlot)} timed out. Auto INTEREST.`);
+    setCurrentAction(`${slotName(payload.actorSlot)} timeout -> INTEREST`);
     playAction(payload.forcedInput || "INTEREST");
     return;
   }
 
   if (payload.phase === "response") {
     if (state.phase !== PHASES.awaitingResponse || payload.actorSlot !== state.pendingResponder) return;
-    setCurrentAction("Response timer expired. Auto ACCEPT.");
+    setCurrentAction("Timeout -> ACCEPT");
     clearPendingClaim();
     if (payload.forcedChoice === "CHALLENGE") resolveChallenge();
     else resolveAccept();
@@ -3273,6 +3271,7 @@ function submitLocalAction(input) {
 function submitLocalResponse(choice) {
   if (state.phase !== PHASES.awaitingResponse || state.pendingResponder !== state.localSlot) return;
   if (state.friend.pendingRequest) return;
+  setCurrentAction(formatDecisionText(state.localSlot, choice));
   clearPendingClaim();
 
   if (state.mode === "friend") {
@@ -3609,7 +3608,6 @@ function updateUI() {
   renderAvatar(ui.avatarPreviewArt, state.profile.avatarId);
   if (ui.homeLevelValue) ui.homeLevelValue.textContent = String(state.profile.level);
   if (ui.homeRankingValue) ui.homeRankingValue.textContent = String(state.profile.ranking);
-  refreshLogoImages();
 
   const showFriendBanner = state.mode === "friend" && state.screen === APP_SCREENS.game;
   ui.friendBanner.classList.toggle("hidden", !showFriendBanner);
@@ -3834,6 +3832,36 @@ function bindModalDismiss(modalNode, closeButtonNode) {
   }
 }
 
+function renderTutorialStep() {
+  if (!(ui.tutorialModal instanceof HTMLElement)) return;
+  const steps = TUTORIAL_STEPS;
+  if (!Array.isArray(steps) || steps.length === 0) return;
+
+  const clampedIndex = clamp(uiRuntime.tutorialStepIndex, 0, steps.length - 1);
+  uiRuntime.tutorialStepIndex = clampedIndex;
+  const step = steps[clampedIndex];
+
+  if (ui.tutorialStepText) ui.tutorialStepText.textContent = step.text;
+  if (ui.tutorialNextBtn) ui.tutorialNextBtn.textContent = step.button;
+  ui.tutorialModal.dataset.step = step.focus || "none";
+}
+
+function openTutorial() {
+  uiRuntime.tutorialStepIndex = 0;
+  renderTutorialStep();
+  openModal(ui.tutorialModal);
+}
+
+function advanceTutorialStep() {
+  const lastIndex = TUTORIAL_STEPS.length - 1;
+  if (uiRuntime.tutorialStepIndex >= lastIndex) {
+    closeModal(ui.tutorialModal);
+    return;
+  }
+  uiRuntime.tutorialStepIndex += 1;
+  renderTutorialStep();
+}
+
 async function copyToClipboard(text) {
   if (!text) return false;
   try {
@@ -3965,7 +3993,7 @@ function onBottomCardsClick(event) {
     const exists = current.includes(cardIndex);
     const next = exists ? current.filter((idx) => idx !== cardIndex) : [...current, cardIndex];
     setDraftSelectionsForSlot(state.localSlot, next);
-    setCurrentAction(`Draft selection: ${normalizeDraftSelectionIndices(next).length} card(s) marked for swap.`);
+    setCurrentAction(`Swaps selected: ${normalizeDraftSelectionIndices(next).length}`);
     return;
   }
 
@@ -4035,7 +4063,7 @@ function bindEvents() {
   ui.tournamentsBtn.addEventListener("click", () => {
     showActionToast("Tournaments coming soon");
   });
-  ui.modeOpenRulesBtn.addEventListener("click", () => openModal(ui.rulesModal));
+  ui.startTutorialBtn.addEventListener("click", () => openTutorial());
 
   ui.createLinkBtn.addEventListener("click", () => {
     void createFriendRoomAsHost();
@@ -4097,6 +4125,7 @@ function bindEvents() {
   ui.rulesCloseBtn.addEventListener("click", () => closeModal(ui.rulesModal));
   ui.premiumCloseBtn.addEventListener("click", () => closeModal(ui.premiumModal));
   ui.goPremiumBtn.addEventListener("click", () => showActionToast("Available soon"));
+  ui.tutorialNextBtn.addEventListener("click", () => advanceTutorialStep());
 
   ui.avatarPreviewBtn.addEventListener("click", () => openModal(ui.avatarModal));
   ui.avatarGrid.addEventListener("click", onAvatarChoice);
@@ -4146,7 +4175,6 @@ function cacheElements() {
   ui.homeRankingValue = document.getElementById("homeRankingValue");
   ui.homeTipText = document.getElementById("homeTipText");
   ui.homeTipDots = document.getElementById("homeTipDots");
-  ui.homeLogoImg = document.getElementById("homeLogoImg");
   ui.playerNameInput = document.getElementById("playerNameInput");
   ui.avatarPreviewBtn = document.getElementById("avatarPreviewBtn");
   ui.avatarPreviewArt = document.getElementById("avatarPreviewArt");
@@ -4156,8 +4184,7 @@ function cacheElements() {
   ui.playBotBtn = document.getElementById("playBotBtn");
   ui.playFriendBtn = document.getElementById("playFriendBtn");
   ui.tournamentsBtn = document.getElementById("tournamentsBtn");
-  ui.modeOpenRulesBtn = document.getElementById("modeOpenRulesBtn");
-  ui.modeLogoImg = document.getElementById("modeLogoImg");
+  ui.startTutorialBtn = document.getElementById("startTutorialBtn");
 
   ui.friendBackBtn = document.getElementById("friendBackBtn");
   ui.createLinkBtn = document.getElementById("createLinkBtn");
@@ -4183,7 +4210,6 @@ function cacheElements() {
 
   ui.gameBackBtn = document.getElementById("gameBackBtn");
   ui.rulesBtn = document.getElementById("rulesBtn");
-  ui.matchLogoImg = document.getElementById("matchLogoImg");
   ui.friendBanner = document.getElementById("friendBanner");
 
   ui.roundLabel = document.getElementById("roundLabel");
@@ -4211,10 +4237,12 @@ function cacheElements() {
   ui.responseOverlay = document.getElementById("responseOverlay");
   ui.acceptBtn = document.getElementById("acceptBtn");
   ui.challengeBtn = document.getElementById("challengeBtn");
+  ui.tutorialModal = document.getElementById("tutorialModal");
+  ui.tutorialStepText = document.getElementById("tutorialStepText");
+  ui.tutorialNextBtn = document.getElementById("tutorialNextBtn");
 
   ui.resultWinnerText = document.getElementById("resultWinnerText");
   ui.resultSummaryText = document.getElementById("resultSummaryText");
-  ui.resultLogoImg = document.getElementById("resultLogoImg");
   ui.resultDuelNames = document.getElementById("resultDuelNames");
   ui.resultLocalCard = document.getElementById("resultLocalCard");
   ui.resultOpponentCard = document.getElementById("resultOpponentCard");
@@ -4241,10 +4269,8 @@ function cacheElements() {
   ui.rulesModal = document.getElementById("rulesModal");
   ui.rulesCloseBtn = document.getElementById("rulesCloseBtn");
   ui.rulesRoleList = document.getElementById("rulesRoleList");
-  ui.rulesLogoImg = document.getElementById("rulesLogoImg");
   ui.premiumModal = document.getElementById("premiumModal");
   ui.premiumCloseBtn = document.getElementById("premiumCloseBtn");
-  ui.premiumLogoImg = document.getElementById("premiumLogoImg");
   ui.goPremiumBtn = document.getElementById("goPremiumBtn");
   ui.copyToast = document.getElementById("copyToast");
   ui.actionToast = document.getElementById("actionToast");
@@ -4328,7 +4354,6 @@ function exposeSupabaseTest() {
 
 async function init() {
   cacheElements();
-  refreshLogoImages();
   applyAssetCssVariables();
   renderAvatarChoices();
   renderRulesRoleList();
