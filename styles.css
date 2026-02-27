@@ -136,11 +136,56 @@ body {
   font-size: var(--fs-md);
 }
 
+.mode-btn-disabled {
+  opacity: 0.56;
+  border-style: dashed;
+}
+
+.mode-btn-disabled:focus-visible {
+  outline-color: rgba(181, 181, 181, 0.7);
+}
+
 .app-title {
   margin: 0;
   font-size: var(--fs-xl);
   letter-spacing: 0.03em;
-  text-align: center;
+  text-align: left;
+}
+
+.title-with-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 2vw, 10px);
+}
+
+.title-logo {
+  width: clamp(26px, 7.6vw, 38px);
+  height: clamp(26px, 7.6vw, 38px);
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.mode-title-row .section-title {
+  text-align: left;
+}
+
+.mode-subtitle {
+  font-weight: 700;
+}
+
+.mode-helper {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.mode-helper-text {
+  font-weight: 700;
+}
+
+.mode-helper-btn {
+  width: min(210px, 100%);
 }
 
 .home-hero {
@@ -1028,15 +1073,22 @@ body {
 }
 
 .result-brand {
-  display: grid;
-  justify-items: center;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .result-logo {
-  width: min(54vw, 180px);
-  max-height: 56px;
+  width: clamp(32px, 9.5vw, 52px);
+  height: clamp(32px, 9.5vw, 52px);
+  max-height: none;
   object-fit: contain;
+}
+
+.result-game-name {
+  text-align: left;
+  font-size: clamp(1.26rem, 4.6vw, 1.92rem);
 }
 
 .result-headline {
@@ -1070,6 +1122,16 @@ body {
   justify-items: center;
   gap: 4px;
   background: rgba(35, 33, 30, 0.88);
+}
+
+#resultLocalCard {
+  justify-items: start;
+  text-align: left;
+}
+
+#resultOpponentCard {
+  justify-items: end;
+  text-align: right;
 }
 
 .result-avatar-card.is-winner {
@@ -1120,6 +1182,11 @@ body {
   padding: 6px;
   display: grid;
   gap: 2px;
+  text-align: left;
+}
+
+.result-stats-card--right {
+  text-align: right;
 }
 
 .result-stats-label {
@@ -1134,6 +1201,28 @@ body {
   font-size: var(--fs-xs);
   color: #dededb;
   font-weight: 700;
+}
+
+.result-stats-card--right .result-stats-label,
+.result-stats-card--right .result-stats-line {
+  text-align: right;
+}
+
+.rank-delta {
+  margin-left: 4px;
+  font-weight: 900;
+}
+
+.rank-delta--up {
+  color: #8fd25f;
+}
+
+.rank-delta--down {
+  color: #ef6969;
+}
+
+.rank-delta--flat {
+  color: var(--muted);
 }
 
 .result-site {
@@ -1292,11 +1381,27 @@ body {
 }
 
 .rules-text {
-  margin: 24px 0 0;
+  margin: 8px 0 0;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   white-space: pre-wrap;
   font-size: var(--fs-sm);
   line-height: 1.24;
+}
+
+.rules-title-row {
+  justify-content: flex-start;
+  padding-right: calc(var(--tap) + 8px);
+}
+
+.rules-modal-title {
+  text-align: left;
+  font-size: clamp(1.02rem, 3.4vw, 1.28rem);
+}
+
+.rules-subtitle {
+  margin-top: -2px;
+  text-align: left;
+  font-size: var(--fs-xs);
 }
 
 .rules-role-list {

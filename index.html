@@ -13,7 +13,10 @@
   <div id="appRoot" class="app-root">
     <section id="homeScreen" class="screen active" aria-label="Home">
       <div class="home-hero">
-        <h1 class="app-title">Liar's Clash</h1>
+        <div class="title-with-logo">
+          <img id="homeLogoImg" class="title-logo hidden" alt="Liar's Clash logo" />
+          <h1 class="app-title">Liar's Clash</h1>
+        </div>
         <p class="home-tagline">Win the mind game.</p>
       </div>
       <div class="screen-card home-card">
@@ -45,9 +48,18 @@
         <button id="modeBackBtn" class="btn btn-back" type="button">Back to Menu</button>
       </div>
       <div class="screen-card mode-card">
-        <h2 class="section-title">Choose Mode</h2>
+        <div class="title-with-logo mode-title-row">
+          <img id="modeLogoImg" class="title-logo hidden" alt="Liar's Clash logo" />
+          <h2 class="section-title mode-game-title">Liar's Clash</h2>
+        </div>
+        <p class="helper-text mode-subtitle">Choose Mode</p>
         <button id="playBotBtn" class="btn mode-btn" type="button">Play vs Bot</button>
         <button id="playFriendBtn" class="btn mode-btn" type="button">Play vs a Friend</button>
+        <button id="tournamentsBtn" class="btn mode-btn mode-btn-disabled" type="button" aria-disabled="true">Tournaments</button>
+        <div class="mode-helper">
+          <p class="helper-text mode-helper-text">First match? Learn the basics.</p>
+          <button id="modeOpenRulesBtn" class="btn btn-secondary mode-helper-btn" type="button">Open Rules</button>
+        </div>
       </div>
     </section>
 
@@ -161,9 +173,9 @@
 
     <section id="resultScreen" class="screen" aria-label="Match Result">
       <div class="screen-card result-card result-summary-card">
-        <header class="result-brand">
+        <header class="result-brand title-with-logo title-with-logo--result">
           <img id="resultLogoImg" class="result-logo hidden" alt="Liar's Clash logo" />
-          <h2 id="resultLogoFallback" class="section-title">Liar's Clash</h2>
+          <h2 class="section-title result-game-name">Liar's Clash</h2>
         </header>
         <div class="result-duel">
           <p id="resultDuelNames" class="result-duel-names">Player vs Opponent</p>
@@ -189,7 +201,7 @@
             <p id="resultLocalGoldText" class="result-stats-line">Gold: 0</p>
             <p id="resultLocalRankText" class="result-stats-line">Ranking: 1000</p>
           </div>
-          <div class="result-stats-card">
+          <div class="result-stats-card result-stats-card--right">
             <p id="resultOpponentStatsLabel" class="result-stats-label">Opponent</p>
             <p id="resultOpponentHpText" class="result-stats-line">HP: 0</p>
             <p id="resultOpponentGoldText" class="result-stats-line">Gold: 0</p>
@@ -201,7 +213,7 @@
           <button id="shareResultBtn" class="btn" type="button">Share</button>
           <button id="backToMenuBtn" class="btn" type="button">Back to Menu</button>
         </div>
-        <p class="result-site">liar-s-clash.vercel.app</p>
+        <p class="result-site">Juega gratis en liar-s-clash.vercel.app</p>
       </div>
     </section>
   </div>
@@ -237,6 +249,11 @@
   <section id="rulesModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Quick rules">
     <div class="modal-card">
       <button id="rulesCloseBtn" class="modal-close-btn" type="button" aria-label="Close quick rules">X</button>
+      <div class="title-with-logo rules-title-row">
+        <img id="rulesLogoImg" class="title-logo hidden" alt="Liar's Clash logo" />
+        <h2 class="section-title rules-modal-title">Liar's Clash</h2>
+      </div>
+      <p class="helper-text rules-subtitle">Quick Rules</p>
       <pre class="rules-text">=== LIAR'S CLASH - QUICK RULES ===
 
 Goal:
@@ -278,7 +295,7 @@ STRIKE -> 1 damage (2 Gold)
   <section id="premiumModal" class="modal-overlay premium-modal hidden" role="dialog" aria-modal="true" aria-label="Premium">
     <div class="premium-shell">
       <header class="premium-topbar">
-        <h2 class="premium-title">Liar’s Clash Premium</h2>
+        <h2 class="premium-title">Liar's Clash Premium</h2>
         <button id="premiumCloseBtn" class="modal-close-btn" type="button" aria-label="Close premium modal">X</button>
       </header>
       <section class="premium-hero">
@@ -286,14 +303,14 @@ STRIKE -> 1 damage (2 Gold)
         <button id="goPremiumBtn" class="btn btn-premium premium-go-btn" type="button">Go Premium</button>
       </section>
       <section class="premium-benefits" aria-label="Premium benefits">
-        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Join all tournaments</span></article>
-        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Weekly prize tournament included!</span></article>
-        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Create private tournaments</span></article>
-        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Exclusive avatars</span></article>
-        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Character skins</span></article>
-        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Special bots + trainer</span></article>
-        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>No ads</span></article>
-        <article class="premium-benefit"><span class="premium-benefit-icon">◆</span><span>Deep analysis</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Join all tournaments</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Weekly prize tournament included!</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Create private tournaments</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Exclusive avatars</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Character skins</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Special bots + trainer</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>No ads</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Deep analysis</span></article>
       </section>
       <p class="premium-disclaimer">Premium features do not provide in-game advantages.</p>
     </div>

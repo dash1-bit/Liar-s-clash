@@ -824,6 +824,34 @@ function getLogoPath() {
   return withAssetVersion(ASSET_MAP.logoPath || "");
 }
 
+function bindLogoImageNode(node) {
+  if (!node || node.dataset.logoBound === "1") return;
+  node.dataset.logoBound = "1";
+  node.addEventListener("load", () => {
+    node.classList.remove("hidden");
+  });
+  node.addEventListener("error", () => {
+    node.classList.add("hidden");
+  });
+}
+
+function refreshLogoImages() {
+  const logoPath = getLogoPath();
+  const nodes = [ui.homeLogoImg, ui.modeLogoImg, ui.rulesLogoImg, ui.resultLogoImg];
+  nodes.forEach((node) => {
+    if (!node) return;
+    bindLogoImageNode(node);
+    if (!logoPath) {
+      node.classList.add("hidden");
+      return;
+    }
+    if (node.dataset.src !== logoPath) {
+      node.dataset.src = logoPath;
+      node.src = logoPath;
+    }
+  });
+}
+
 function createInlineIcon(iconKey, className = "inline-icon") {
   const iconPath = ASSET_MAP.iconPaths[iconKey];
   if (!iconPath) return null;
@@ -3320,8 +3348,27 @@ function getResultWinnerText() {
   return "MATCH END";
 }
 
+function getResultSummaryText() {
+  if (state.matchWinner === state.localSlot) return "Checkmate\u2026 in your mind.";
+  if (state.matchWinner === "draw") return "Mind games tied. Run it back?";
+  return "Outplayed. Run it back?";
+}
+
 function getSlotRanking(slot) {
   return slot === state.localSlot ? state.profile.ranking : state.profile.opponentRanking;
+}
+
+function getRankingDeltaForSlot(slot) {
+  if (!state.matchWinner || state.matchWinner === "draw") return 0;
+  return state.matchWinner === slot ? 50 : -50;
+}
+
+function formatRankingLine(slot) {
+  const ranking = getSlotRanking(slot);
+  const delta = getRankingDeltaForSlot(slot);
+  if (delta > 0) return `Ranking: ${ranking} <span class="rank-delta rank-delta--up">(+${delta})</span>`;
+  if (delta < 0) return `Ranking: ${ranking} <span class="rank-delta rank-delta--down">(${delta})</span>`;
+  return `Ranking: ${ranking} <span class="rank-delta rank-delta--flat">(+0)</span>`;
 }
 
 function getConnectionBannerText() {
@@ -3543,6 +3590,7 @@ function updateUI() {
   renderAvatar(ui.avatarPreviewArt, state.profile.avatarId);
   if (ui.homeLevelValue) ui.homeLevelValue.textContent = String(state.profile.level);
   if (ui.homeRankingValue) ui.homeRankingValue.textContent = String(state.profile.ranking);
+  refreshLogoImages();
 
   const showFriendBanner = state.mode === "friend" && state.screen === APP_SCREENS.game;
   ui.friendBanner.classList.toggle("hidden", !showFriendBanner);
@@ -3670,7 +3718,7 @@ function updateUI() {
   ui.appRoot.classList.toggle("response-open", showResponse);
 
   ui.resultWinnerText.textContent = getResultWinnerText();
-  ui.resultSummaryText.textContent = state.matchEndReason || "Match complete.";
+  ui.resultSummaryText.textContent = getResultSummaryText();
 
   const localSlot = state.localSlot || "human";
   const opponentSlot = opponentOf(localSlot);
@@ -3686,22 +3734,14 @@ function updateUI() {
   if (ui.resultOpponentHpText) ui.resultOpponentHpText.textContent = `HP: ${opponentPlayer.hp}`;
   if (ui.resultLocalGoldText) ui.resultLocalGoldText.textContent = `Gold: ${localPlayer.gold}`;
   if (ui.resultOpponentGoldText) ui.resultOpponentGoldText.textContent = `Gold: ${opponentPlayer.gold}`;
-  if (ui.resultLocalRankText) ui.resultLocalRankText.textContent = `Ranking: ${getSlotRanking(localSlot)}`;
-  if (ui.resultOpponentRankText) ui.resultOpponentRankText.textContent = `Ranking: ${getSlotRanking(opponentSlot)}`;
+  if (ui.resultLocalRankText) ui.resultLocalRankText.innerHTML = formatRankingLine(localSlot);
+  if (ui.resultOpponentRankText) ui.resultOpponentRankText.innerHTML = formatRankingLine(opponentSlot);
   if (ui.resultLocalCard) ui.resultLocalCard.classList.toggle("is-winner", state.matchWinner === localSlot);
   if (ui.resultOpponentCard) ui.resultOpponentCard.classList.toggle("is-winner", state.matchWinner === opponentSlot);
   if (ui.resultLocalCard) ui.resultLocalCard.classList.toggle("is-draw", state.matchWinner === "draw");
   if (ui.resultOpponentCard) ui.resultOpponentCard.classList.toggle("is-draw", state.matchWinner === "draw");
   renderAvatar(ui.resultLocalAvatar, state.slots[localSlot].avatarId);
   renderAvatar(ui.resultOpponentAvatar, state.slots[opponentSlot].avatarId);
-
-  if (ui.resultLogoImg && ui.resultLogoFallback) {
-    const logoPath = getLogoPath();
-    if (ui.resultLogoImg.dataset.src !== logoPath) {
-      ui.resultLogoImg.dataset.src = logoPath;
-      ui.resultLogoImg.src = logoPath;
-    }
-  }
 }
 
 function triggerAnimation(element, className) {
@@ -3948,6 +3988,10 @@ function bindEvents() {
     state.friend.errorMessage = "";
     updateUI();
   });
+  ui.tournamentsBtn.addEventListener("click", () => {
+    showActionToast("Tournaments coming soon");
+  });
+  ui.modeOpenRulesBtn.addEventListener("click", () => openModal(ui.rulesModal));
 
   ui.createLinkBtn.addEventListener("click", () => {
     void createFriendRoomAsHost();
@@ -4058,6 +4102,7 @@ function cacheElements() {
   ui.homeRankingValue = document.getElementById("homeRankingValue");
   ui.homeTipText = document.getElementById("homeTipText");
   ui.homeTipDots = document.getElementById("homeTipDots");
+  ui.homeLogoImg = document.getElementById("homeLogoImg");
   ui.playerNameInput = document.getElementById("playerNameInput");
   ui.avatarPreviewBtn = document.getElementById("avatarPreviewBtn");
   ui.avatarPreviewArt = document.getElementById("avatarPreviewArt");
@@ -4066,6 +4111,9 @@ function cacheElements() {
   ui.modeBackBtn = document.getElementById("modeBackBtn");
   ui.playBotBtn = document.getElementById("playBotBtn");
   ui.playFriendBtn = document.getElementById("playFriendBtn");
+  ui.tournamentsBtn = document.getElementById("tournamentsBtn");
+  ui.modeOpenRulesBtn = document.getElementById("modeOpenRulesBtn");
+  ui.modeLogoImg = document.getElementById("modeLogoImg");
 
   ui.friendBackBtn = document.getElementById("friendBackBtn");
   ui.createLinkBtn = document.getElementById("createLinkBtn");
@@ -4122,7 +4170,6 @@ function cacheElements() {
   ui.resultWinnerText = document.getElementById("resultWinnerText");
   ui.resultSummaryText = document.getElementById("resultSummaryText");
   ui.resultLogoImg = document.getElementById("resultLogoImg");
-  ui.resultLogoFallback = document.getElementById("resultLogoFallback");
   ui.resultDuelNames = document.getElementById("resultDuelNames");
   ui.resultLocalCard = document.getElementById("resultLocalCard");
   ui.resultOpponentCard = document.getElementById("resultOpponentCard");
@@ -4149,6 +4196,7 @@ function cacheElements() {
   ui.rulesModal = document.getElementById("rulesModal");
   ui.rulesCloseBtn = document.getElementById("rulesCloseBtn");
   ui.rulesRoleList = document.getElementById("rulesRoleList");
+  ui.rulesLogoImg = document.getElementById("rulesLogoImg");
   ui.premiumModal = document.getElementById("premiumModal");
   ui.premiumCloseBtn = document.getElementById("premiumCloseBtn");
   ui.goPremiumBtn = document.getElementById("goPremiumBtn");
@@ -4234,16 +4282,7 @@ function exposeSupabaseTest() {
 
 async function init() {
   cacheElements();
-  if (ui.resultLogoImg && ui.resultLogoFallback) {
-    ui.resultLogoImg.addEventListener("load", () => {
-      ui.resultLogoImg.classList.remove("hidden");
-      ui.resultLogoFallback.classList.add("hidden");
-    });
-    ui.resultLogoImg.addEventListener("error", () => {
-      ui.resultLogoImg.classList.add("hidden");
-      ui.resultLogoFallback.classList.remove("hidden");
-    });
-  }
+  refreshLogoImages();
   applyAssetCssVariables();
   renderAvatarChoices();
   renderRulesRoleList();
