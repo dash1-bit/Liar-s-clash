@@ -103,7 +103,7 @@ const ASSET_VERSION = "3";
 const UI_TIMINGS = Object.freeze({
   actionToastMs: 1800,
   currentActionTypeMs: 25,
-  currentActionPauseMs: 2000,
+  currentActionPauseMs: 4000,
   homeTipsRotateMs: 5000
 });
 
@@ -754,11 +754,11 @@ function setFriendError(message) {
 }
 
 function safePlayerName(name) {
-  const cleaned = String(name || "Player")
+  const cleaned = String(name || "Matt")
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, 18);
-  return cleaned || "Player";
+  return cleaned || "Matt";
 }
 
 function normalizeAvatarId(value) {
@@ -839,7 +839,7 @@ function bindLogoImageNode(node) {
 
 function refreshLogoImages() {
   const logoPath = getLogoPath();
-  const nodes = [ui.homeLogoImg, ui.modeLogoImg, ui.rulesLogoImg, ui.resultLogoImg, ui.premiumLogoImg];
+  const nodes = [ui.homeLogoImg, ui.modeLogoImg, ui.matchLogoImg, ui.rulesLogoImg, ui.resultLogoImg, ui.premiumLogoImg];
   nodes.forEach((node) => {
     if (!node) return;
     bindLogoImageNode(node);
@@ -991,6 +991,7 @@ function applyAssetCssVariables() {
 function createStatSegment(iconKey, text) {
   const segment = document.createElement("span");
   segment.className = "stat-segment";
+  if (String(text).toLowerCase() === "shield") segment.classList.add("stat-segment-shield");
   const icon = createInlineIcon(iconKey, "stat-icon");
   if (icon) segment.appendChild(icon);
   const value = document.createElement("span");
@@ -3316,33 +3317,45 @@ function submitLocalResponse(choice) {
 function getTurnIndicatorText() {
   if (state.screen !== APP_SCREENS.game) return "";
 
-  if (state.phase === PHASES.draft) return "Select cards to change (0–4) then press ACCEPT";
-  if (state.phase === PHASES.awaitingDraftOpponent) return "Waiting for opponent to press ACCEPT...";
-  if (state.phase === PHASES.draftReveal) return "Applying swaps...";
-  if (state.phase === PHASES.gameStart) return "Preparing first turn...";
+  if (state.phase === PHASES.draft) return "SELECT CARDS TO CHANGE (0-4) THEN PRESS ACCEPT";
+  if (state.phase === PHASES.awaitingDraftOpponent) return "WAITING FOR OPPONENT TO PRESS ACCEPT...";
+  if (state.phase === PHASES.draftReveal) return "APPLYING SWAPS...";
+  if (state.phase === PHASES.gameStart) return "PREPARING FIRST TURN...";
 
   if (state.phase === PHASES.choosingAction) {
     if (state.currentActor === state.localSlot) {
-      if (state.friend.pendingRequest === "action") return "Waiting host confirmation...";
-      return "Your turn";
+      if (state.friend.pendingRequest === "action") return "WAITING HOST CONFIRMATION...";
+      return "YOUR TURN";
     }
-    if (state.mode === "bot" && state.currentActor === "bot") return state.thinking ? "Bot thinking..." : "Bot turn";
-    return `${slotName(state.currentActor)} turn`;
+    return "OPPONENT TURN";
   }
 
   if (state.phase === PHASES.awaitingResponse) {
     if (state.pendingResponder === state.localSlot) {
-      if (state.friend.pendingRequest === "response") return "Waiting host confirmation...";
-      return "Your decision";
+      if (state.friend.pendingRequest === "response") return "WAITING HOST CONFIRMATION...";
+      return "YOUR DECISION";
     }
-    if (state.mode === "bot" && state.pendingResponder === "bot") return state.thinking ? "Bot thinking..." : "Bot deciding";
-    return `${slotName(state.pendingResponder)} deciding`;
+    return "OPPONENT TURN";
   }
 
-  if (state.phase === PHASES.resolvingDelay || state.phase === PHASES.applyingEffects) return "Resolving...";
-  return "Waiting...";
+  if (state.phase === PHASES.resolvingDelay || state.phase === PHASES.applyingEffects) return "RESOLVING...";
+  return "WAITING...";
 }
 
+function getTurnIndicatorTone() {
+  if (state.screen !== APP_SCREENS.game) return "neutral";
+  if (state.phase === PHASES.choosingAction) {
+    if (state.currentActor === state.localSlot && state.friend.pendingRequest !== "action") return "your-turn";
+    if (state.currentActor !== state.localSlot) return "opponent-turn";
+    return "neutral";
+  }
+  if (state.phase === PHASES.awaitingResponse) {
+    if (state.pendingResponder === state.localSlot && state.friend.pendingRequest !== "response") return "your-decision";
+    if (state.pendingResponder !== state.localSlot) return "opponent-turn";
+    return "neutral";
+  }
+  return "neutral";
+}
 function getResultWinnerText() {
   if (state.matchWinner === "draw") return "DRAW";
   if (state.matchWinner === state.localSlot) return "YOU WIN";
@@ -3382,7 +3395,10 @@ function getConnectionBannerText() {
 function getActiveTurnSlot() {
   if (state.screen !== APP_SCREENS.game) return null;
   if (state.phase === PHASES.choosingAction) return state.currentActor;
-  if (state.phase === PHASES.awaitingResponse) return state.pendingResponder;
+  if (state.phase === PHASES.awaitingResponse) {
+    if (state.pendingResponder === state.localSlot && state.pendingAction) return state.pendingAction.actor;
+    return state.pendingResponder;
+  }
   return null;
 }
 
@@ -3666,6 +3682,11 @@ function updateUI() {
     : `ROUND ${Math.min(state.round, MATCH_SETTINGS.MAX_ROUNDS)}/${MATCH_SETTINGS.MAX_ROUNDS}`;
   ui.timerText.textContent = state.timer.mode ? `${state.timer.remaining}s` : "--";
   ui.turnIndicator.textContent = getTurnIndicatorText();
+  const turnTone = getTurnIndicatorTone();
+  ui.turnIndicator.classList.toggle("turn-indicator--your-turn", turnTone === "your-turn");
+  ui.turnIndicator.classList.toggle("turn-indicator--your-decision", turnTone === "your-decision");
+  ui.turnIndicator.classList.toggle("turn-indicator--opponent-turn", turnTone === "opponent-turn");
+  ui.turnIndicator.classList.toggle("turn-indicator--neutral", turnTone === "neutral");
   ui.turnIndicator.classList.toggle("draft-instruction", localDraftPending);
   renderCurrentActionTypewriter(state.currentActionText);
 
@@ -3682,14 +3703,21 @@ function updateUI() {
     state.phase === PHASES.choosingAction &&
     state.currentActor === state.localSlot &&
     !state.friend.pendingRequest;
+  const inLocalDecision =
+    state.screen === APP_SCREENS.game &&
+    state.phase === PHASES.awaitingResponse &&
+    state.pendingResponder === state.localSlot &&
+    !state.friend.pendingRequest;
+  const localTurnLocked = state.screen === APP_SCREENS.game && !draftMode && !canLocalAct && !inLocalDecision;
 
   const canUseStrike = canLocalAct && state.players[state.localSlot].gold >= BASIC_ACTIONS.STRIKE.cost;
   ui.interestBtn.disabled = false;
   ui.strikeBtn.disabled = false;
-  ui.interestBtn.classList.toggle("is-disabled", !canLocalAct);
-  ui.strikeBtn.classList.toggle("is-disabled", !canUseStrike);
+  ui.interestBtn.classList.toggle("is-disabled", !canLocalAct && !inLocalDecision);
+  ui.strikeBtn.classList.toggle("is-disabled", (!canUseStrike && !inLocalDecision) || localTurnLocked);
   ui.interestBtn.setAttribute("aria-disabled", canLocalAct ? "false" : "true");
   ui.strikeBtn.setAttribute("aria-disabled", canUseStrike ? "false" : "true");
+  ui.bottomPanel.classList.toggle("actions-locked", localTurnLocked);
 
   const showDraftAccept =
     state.screen === APP_SCREENS.game &&
@@ -4155,6 +4183,7 @@ function cacheElements() {
 
   ui.gameBackBtn = document.getElementById("gameBackBtn");
   ui.rulesBtn = document.getElementById("rulesBtn");
+  ui.matchLogoImg = document.getElementById("matchLogoImg");
   ui.friendBanner = document.getElementById("friendBanner");
 
   ui.roundLabel = document.getElementById("roundLabel");
