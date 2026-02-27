@@ -42,14 +42,14 @@ const ROLE_CONFIG = Object.freeze({
   KNIGHT: Object.freeze({ name: "KNIGHT", cost: 2, description: "2 DMG", passive: false }),
   GOBLIN: Object.freeze({ name: "GOBLIN", cost: 0, description: "Steal 1 Gold", maxUses: 3, passive: false }),
   ENT: Object.freeze({ name: "ENT", cost: 2, description: "+2 HP", passive: false }),
-  ELF: Object.freeze({ name: "ELF", cost: 0, description: "Passive: +1 Gold on defend", passive: true }),
+  ELF: Object.freeze({ name: "ELF", cost: 0, description: "+2 Gold on catch lie", passive: true }),
   PIRATE: Object.freeze({ name: "PIRATE", cost: 0, description: "1 DMG +1 Gold", maxUses: 2, passive: false }),
   SCIENTIST: Object.freeze({ name: "SCIENTIST", cost: 0, description: "+1 Gold + reveal unknown card", maxUses: 2, passive: false }),
   JOKER: Object.freeze({ name: "JOKER", cost: 1, description: "1 DMG then transform", passive: false }),
-  BERSERK: Object.freeze({ name: "BERSERK", cost: 0, description: "Self -1 HP, enemy -2 HP", passive: false }),
-  BANKER: Object.freeze({ name: "BANKER", cost: 2, description: "Passive: +1 Gold each round", passive: true }),
+  BERSERK: Object.freeze({ name: "BERSERK", cost: 0, description: "Self -1 HP enemy -2 HP", passive: false }),
+  BANKER: Object.freeze({ name: "BANKER", cost: 2, description: "+1 Gold / round", passive: false }),
   ANGEL: Object.freeze({ name: "ANGEL", cost: 1, description: "Swap HP and Gold", maxUses: 1, passive: false }),
-  VALK: Object.freeze({ name: "VALK", cost: 3, description: "Enemy -1 HP, self +1 HP", passive: false }),
+  VALK: Object.freeze({ name: "VALK", cost: 3, description: "Enemy -1 HP self +1 HP", passive: false }),
   APPRENTICE: Object.freeze({ name: "APPRENTICE", cost: 2, description: "Scales each round", passive: false, apprentice: true })
 });
 
@@ -621,6 +621,7 @@ function createPlayerState(key) {
     key,
     hp: MATCH_SETTINGS.START_HP,
     gold: MATCH_SETTINGS.START_GOLD,
+    bankerBuff: false,
     shield: false,
     blockedActions: 0,
     realRoles: [],
@@ -823,9 +824,9 @@ function renderRoleDescription(node, role, card = null) {
       icon("hp");
       break;
     case "ELF":
-      appendText(node, "Passive: +1 ");
+      appendText(node, "+2 ");
       icon("gold");
-      appendText(node, " on defend");
+      appendText(node, " on catch lie");
       break;
     case "PIRATE":
       appendText(node, "1 ");
@@ -846,13 +847,13 @@ function renderRoleDescription(node, role, card = null) {
     case "BERSERK":
       appendText(node, "Self -1 ");
       icon("hp");
-      appendText(node, ", enemy -2 ");
+      appendText(node, " enemy -2 ");
       icon("hp");
       break;
     case "BANKER":
-      appendText(node, "Passive +1 ");
+      appendText(node, "+1 ");
       icon("gold");
-      appendText(node, " each round");
+      appendText(node, " / round");
       break;
     case "ANGEL":
       appendText(node, "Swap ");
@@ -863,15 +864,13 @@ function renderRoleDescription(node, role, card = null) {
     case "VALK":
       appendText(node, "Enemy -1 ");
       icon("hp");
-      appendText(node, ", self +1 ");
+      appendText(node, " self +1 ");
       icon("hp");
       break;
     case "APPRENTICE": {
       const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
-      const cost = clamp(typeof card?.apprenticeCost === "number" ? card.apprenticeCost : 2, 2, 6);
       appendText(node, `${dmg} `);
       icon("sword");
-      appendText(node, ` (Cost ${cost})`);
       break;
     }
     default:
@@ -1112,6 +1111,11 @@ function getRoleMeta(role) {
   return ROLE_CONFIG[role] || null;
 }
 
+function getRoleDisplayName(role) {
+  if (role === "APPRENTICE") return "ADEPT";
+  return String(role || "");
+}
+
 function getPlayableRoles() {
   return Object.keys(ROLE_CONFIG).filter((role) => !ROLE_CONFIG[role].passive);
 }
@@ -1258,6 +1262,7 @@ function applyLoadoutToPlayer(playerKey, loadout) {
   player.cards.forEach((card) => {
     applyCardRoleDefaults(card, card.role);
   });
+  player.bankerBuff = Boolean(loadout.bankerBuff);
 
   const groups = rolesFromCards(player.cards);
   player.realRoles = Array.isArray(loadout.realRoles) && loadout.realRoles.length > 0 ? [...loadout.realRoles] : groups.realRoles;
@@ -1389,7 +1394,7 @@ function scaleApprenticeCardsForNewRound(playerKey) {
 
 function applyRoundStartPassives() {
   ["human", "bot"].forEach((playerKey) => {
-    if (playerHasRealRole(playerKey, "BANKER")) {
+    if (state.players[playerKey].bankerBuff) {
       applyGold(playerKey, 1, "BANKER passive");
     }
     if (state.round > 1) scaleApprenticeCardsForNewRound(playerKey);
@@ -1993,6 +1998,7 @@ function buildSyncSnapshot() {
     human: {
       hp: state.players.human.hp,
       gold: state.players.human.gold,
+      bankerBuff: state.players.human.bankerBuff,
       shield: state.players.human.shield,
       blockedActions: state.players.human.blockedActions,
       realRoles: [...state.players.human.realRoles],
@@ -2003,6 +2009,7 @@ function buildSyncSnapshot() {
     bot: {
       hp: state.players.bot.hp,
       gold: state.players.bot.gold,
+      bankerBuff: state.players.bot.bankerBuff,
       shield: state.players.bot.shield,
       blockedActions: state.players.bot.blockedActions,
       realRoles: [...state.players.bot.realRoles],
@@ -2110,6 +2117,7 @@ function applySyncPayload(payload) {
   if (snap.players && snap.players.human) {
     state.players.human.hp = Number(snap.players.human.hp) || MATCH_SETTINGS.START_HP;
     state.players.human.gold = Number(snap.players.human.gold) || MATCH_SETTINGS.START_GOLD;
+    state.players.human.bankerBuff = Boolean(snap.players.human.bankerBuff);
     state.players.human.shield = Boolean(snap.players.human.shield);
     state.players.human.blockedActions = Number(snap.players.human.blockedActions) || 0;
     state.players.human.roleUses = Object.assign(Object.create(null), snap.players.human.roleUses || {});
@@ -2118,6 +2126,7 @@ function applySyncPayload(payload) {
   if (snap.players && snap.players.bot) {
     state.players.bot.hp = Number(snap.players.bot.hp) || MATCH_SETTINGS.START_HP;
     state.players.bot.gold = Number(snap.players.bot.gold) || MATCH_SETTINGS.START_GOLD;
+    state.players.bot.bankerBuff = Boolean(snap.players.bot.bankerBuff);
     state.players.bot.shield = Boolean(snap.players.bot.shield);
     state.players.bot.blockedActions = Number(snap.players.bot.blockedActions) || 0;
     state.players.bot.roleUses = Object.assign(Object.create(null), snap.players.bot.roleUses || {});
@@ -2353,7 +2362,7 @@ function normalizeActionInput(actor, input) {
   return {
     kind: "role",
     id: card.role,
-    label: card.role,
+    label: getRoleDisplayName(card.role),
     role: card.role,
     cardIndex,
     cost: dynamicCost,
@@ -2526,7 +2535,7 @@ function resolveAccept() {
   if (!action) return;
 
   if (typeof action.cardIndex === "number") markRoleReveal(action.actor, action.cardIndex);
-  setCurrentAction(`ACCEPTED. ${slotName(action.actor)} resolves ${action.role}.`);
+  setCurrentAction(`ACCEPTED. ${slotName(action.actor)} resolves ${action.label || getRoleDisplayName(action.role)}.`);
 
   runResolutionAfterDelay(() => {
     const pending = state.pendingAction;
@@ -2573,10 +2582,10 @@ function resolveChallenge() {
     if (result.isReal) {
       applyDamage(result.challenger, 1, "failed challenge");
       applyEffect(pending);
-      if (playerHasRealRole(result.actor, "ELF")) applyGold(result.actor, 1, "ELF passive bonus");
       if (state.mode === "bot" && result.challenger === "bot") adjustSuspicion(result.role, -0.15);
     } else {
       applyDamage(result.actor, 2, "bluff penalty");
+      if (playerHasRealRole(result.challenger, "ELF")) applyGold(result.challenger, 2, "ELF catch lie bonus");
       if (state.mode === "bot" && result.challenger === "bot") adjustSuspicion(result.role, 0.24);
     }
 
@@ -2626,7 +2635,7 @@ function applyEffect(action) {
         const revealed = revealCardVerification(target, revealIndex, "SCIENTIST");
         if (revealed) {
           const status = revealed.isReal ? "REAL" : "FAKE";
-          setCurrentAction(`${slotName(actor)} revealed ${slotName(target)} ${revealed.role}: ${status}.`);
+          setCurrentAction(`${slotName(actor)} revealed ${slotName(target)} ${getRoleDisplayName(revealed.role)}: ${status}.`);
         }
       }
       break;
@@ -2635,13 +2644,17 @@ function applyEffect(action) {
       applyDamage(target, 1, "JOKER");
       const transformedInto = replaceJokerCard(actor, action.cardIndex);
       if (transformedInto) {
-        setCurrentAction(`${slotName(actor)} transformed JOKER into ${transformedInto}.`);
+        setCurrentAction(`${slotName(actor)} transformed JOKER into ${getRoleDisplayName(transformedInto)}.`);
       }
       break;
     }
     case "BERSERK":
       applyDamage(actor, 1, "BERSERK recoil");
       applyDamage(target, 2, "BERSERK");
+      break;
+    case "BANKER":
+      state.players[actor].bankerBuff = true;
+      setCurrentAction(`${slotName(actor)} activated BANKER: +1 Gold each round.`);
       break;
     case "ANGEL": {
       const actorState = state.players[actor];
@@ -2734,7 +2747,7 @@ function gatherLegalActions(playerKey) {
       kind: "role",
       id: card.role,
       role: card.role,
-      label: card.role,
+      label: getRoleDisplayName(card.role),
       cardIndex,
       cost: dynamicCost,
       isReal: card.isReal,
@@ -2820,6 +2833,9 @@ function scoreBotAction(action) {
     case "BERSERK":
       score += human.hp <= 2 ? 2.4 : 1.2;
       if (bot.hp <= 2) score -= 1.5;
+      break;
+    case "BANKER":
+      score += bot.bankerBuff ? -0.8 : 1.9;
       break;
     case "ANGEL":
       if (bot.hp <= 2 && bot.gold >= 3) score += 3.4;
@@ -2931,6 +2947,9 @@ function botShouldChallenge(action) {
       break;
     case "BERSERK":
       preventedSwing = 2.1;
+      break;
+    case "BANKER":
+      preventedSwing = 1.8;
       break;
     case "ANGEL":
       preventedSwing = 2.2;
@@ -3120,8 +3139,8 @@ function submitLocalResponse(choice) {
 function getTurnIndicatorText() {
   if (state.screen !== APP_SCREENS.game) return "";
 
-  if (state.phase === PHASES.draft) return "Draft: select cards to swap, then tap ACCEPT";
-  if (state.phase === PHASES.awaitingDraftOpponent) return "Waiting for opponent draft accept...";
+  if (state.phase === PHASES.draft) return "Select cards to change (0-4) then press ACCEPT";
+  if (state.phase === PHASES.awaitingDraftOpponent) return "Waiting for opponent to press ACCEPT...";
   if (state.phase === PHASES.draftReveal) return "Applying swaps...";
   if (state.phase === PHASES.gameStart) return "Preparing first turn...";
 
@@ -3212,6 +3231,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
 
   const artLayer = document.createElement("span");
   artLayer.className = "card-art";
+  if (card.role === "ANGEL") artLayer.classList.add("card-art-angel");
   const roleImagePath = getRoleImagePath(card.role);
   if (roleImagePath) artLayer.style.backgroundImage = `url("${roleImagePath}")`;
   node.appendChild(artLayer);
@@ -3283,7 +3303,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
 
   const label = document.createElement("p");
   label.className = "card-label";
-  label.textContent = card.role;
+  label.textContent = getRoleDisplayName(card.role);
   textPanel.appendChild(label);
 
   const desc = document.createElement("p");
@@ -3307,7 +3327,7 @@ function renderCardsForSlot(container, slot, asInteractive) {
   container.innerHTML = "";
 
   const fragment = document.createDocumentFragment();
-  const cards = state.players[slot].cards;
+  const cards = Array.isArray(state.players[slot].cards) ? state.players[slot].cards : [];
   cards.forEach((card, index) => {
     const draftSelectable = isDraftCardSelectable(slot);
     let enabled = asInteractive || draftSelectable;
@@ -3317,6 +3337,7 @@ function renderCardsForSlot(container, slot, asInteractive) {
       if (enabled && state.players[slot].gold < getRoleCost(card.role, card)) enabled = false;
       if (enabled && !canUseRoleByUses(slot, card.role)) enabled = false;
     }
+    const disabled = slot === state.localSlot ? !enabled : false;
 
     fragment.appendChild(
       createRoleCardNode({
@@ -3324,10 +3345,29 @@ function renderCardsForSlot(container, slot, asInteractive) {
         card,
         cardIndex: index,
         asButton: true,
-        disabled: !enabled
+        disabled
       })
     );
   });
+
+  if (isDraftPhase() && cards.length < 4) {
+    for (let index = cards.length; index < 4; index += 1) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "role-card draft-waiting-card";
+      const textPanel = document.createElement("div");
+      textPanel.className = "card-text-panel";
+      const label = document.createElement("p");
+      label.className = "card-label";
+      label.textContent = "WAITING";
+      const desc = document.createElement("p");
+      desc.className = "card-desc";
+      desc.textContent = "Waiting for opponent...";
+      textPanel.appendChild(label);
+      textPanel.appendChild(desc);
+      placeholder.appendChild(textPanel);
+      fragment.appendChild(placeholder);
+    }
+  }
 
   container.appendChild(fragment);
 }
@@ -3408,11 +3448,20 @@ function updateUI() {
     : `ROUND ${Math.min(state.round, MATCH_SETTINGS.MAX_ROUNDS)}/${MATCH_SETTINGS.MAX_ROUNDS}`;
   ui.timerText.textContent = state.timer.mode ? `${state.timer.remaining}s` : "--";
   ui.turnIndicator.textContent = getTurnIndicatorText();
+  const localDraftPending =
+    isDraftSelectionPhase() &&
+    Boolean(state.draft) &&
+    Boolean(state.localSlot) &&
+    !Boolean(state.draft.accepted[state.localSlot]);
+  ui.turnIndicator.classList.toggle("draft-instruction", localDraftPending);
   renderCurrentActionTypewriter(state.currentActionText);
 
   const activeTurnSlot = getActiveTurnSlot();
   ui.topPanel.classList.toggle("turn-active", activeTurnSlot === topSlot);
   ui.bottomPanel.classList.toggle("turn-active", activeTurnSlot === bottomSlot);
+  const claimActorSlot = state.phase === PHASES.awaitingResponse && state.pendingAction ? state.pendingAction.actor : null;
+  ui.topPanel.classList.toggle("claim-source-active", claimActorSlot === topSlot);
+  ui.bottomPanel.classList.toggle("claim-source-active", claimActorSlot === bottomSlot);
 
   const canLocalAct =
     state.screen === APP_SCREENS.game &&
@@ -3446,6 +3495,7 @@ function updateUI() {
 
   renderCardsForSlot(ui.topCards, topSlot, false);
   renderCardsForSlot(ui.bottomCards, bottomSlot, canLocalAct);
+  ui.bottomCards.classList.toggle("draft-needs-accept", localDraftPending);
 
   const showResponse =
     state.screen === APP_SCREENS.game &&
