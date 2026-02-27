@@ -3543,6 +3543,12 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     realTag.textContent = "REAL";
     badgeLeft.appendChild(realTag);
     hasBadge = true;
+  } else if (ownerSlot === state.localSlot && !card.isReal && !draftMode) {
+    const bluffTag = document.createElement("span");
+    bluffTag.className = "card-badge card-status-tag card-fake-tag";
+    bluffTag.textContent = "BLUFF";
+    badgeLeft.appendChild(bluffTag);
+    hasBadge = true;
   }
 
   if (ownerSlot !== state.localSlot && (card.verification === "REAL" || card.verification === "FAKE")) {
