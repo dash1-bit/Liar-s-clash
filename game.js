@@ -766,6 +766,7 @@ function renderAvatarChoices() {
 function applyAssetCssVariables() {
   if (!document || !document.documentElement) return;
   document.documentElement.style.setProperty("--badge-image", `url("${withAssetVersion(ASSET_MAP.badgePath)}")`);
+  document.documentElement.style.setProperty("--cost-icon-image", `url("${withAssetVersion(ASSET_MAP.iconPaths.gold)}")`);
 }
 
 function createStatSegment(iconKey, text) {
@@ -2416,11 +2417,12 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     hasBadge = true;
   }
 
-  if (ownerSlot !== state.localSlot && card.confirmed) {
-    const confirmedTag = document.createElement("span");
-    confirmedTag.className = "card-badge card-status-tag card-confirmed-tag";
-    confirmedTag.textContent = "CONFIRMED";
-    badgeLeft.appendChild(confirmedTag);
+  if (ownerSlot !== state.localSlot && card.revealedUsed) {
+    const verifiedTag = document.createElement("span");
+    const verifiedIsReal = Boolean(card.confirmed);
+    verifiedTag.className = `card-badge card-status-tag ${verifiedIsReal ? "card-real-tag" : "card-fake-tag"}`;
+    verifiedTag.textContent = verifiedIsReal ? "REAL" : "FAKE";
+    badgeLeft.appendChild(verifiedTag);
     hasBadge = true;
   }
 

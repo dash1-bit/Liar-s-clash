@@ -10,6 +10,7 @@
   --surface-1: #312e2b;
   --surface-2: #262421;
   --badge-image: none;
+  --cost-icon-image: none;
   --response-h: clamp(58px, 11vh, 84px);
   --tap: 44px;
   --pad: clamp(8px, 2.6vw, 14px);
@@ -368,12 +369,13 @@ body {
 }
 
 .player-panel.turn-active {
-  border-color: rgba(129, 182, 76, 0.72);
+  border-color: rgba(129, 182, 76, 0.82);
   background: rgba(50, 46, 41, 0.98);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 0 0 1px rgba(129, 182, 76, 0.26),
-    0 0 12px rgba(129, 182, 76, 0.18);
+    0 0 0 1px rgba(129, 182, 76, 0.34),
+    0 0 16px rgba(129, 182, 76, 0.24);
+  animation: panelTurnPulse 1.9s ease-in-out infinite;
 }
 
 .player-head {
@@ -470,7 +472,7 @@ body {
 }
 
 .role-card.opponent-played {
-  filter: grayscale(0.25);
+  filter: none;
 }
 
 .role-card.opponent-confirmed {
@@ -546,7 +548,7 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 4px;
-  z-index: 3;
+  z-index: 5;
   pointer-events: none;
 }
 
@@ -569,22 +571,24 @@ body {
   line-height: 1;
   font-size: clamp(0.5rem, 1.5vw, 0.62rem);
   font-weight: 800;
-  z-index: 3;
+  z-index: 6;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .card-cost {
   border: 0;
   background-color: transparent;
-  background-image: var(--badge-image);
-  background-size: 100% 100%;
+  background-image: var(--cost-icon-image);
+  background-size: contain;
+  background-position: center;
   background-repeat: no-repeat;
   color: #fff;
-  min-width: 22px;
-  min-height: 20px;
+  min-width: 24px;
+  min-height: 24px;
   display: grid;
   place-items: center;
-  padding: 1px 5px;
+  padding: 1px 4px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 }
 
 .card-passive {
@@ -604,8 +608,11 @@ body {
   text-shadow: none;
 }
 
-.card-confirmed-tag {
-  color: #0f1f05;
+.card-fake-tag {
+  color: #2f110c;
+  border-color: rgba(229, 106, 82, 0.66);
+  background: rgba(229, 106, 82, 0.94);
+  text-shadow: none;
 }
 
 .current-action-panel {
@@ -630,14 +637,22 @@ body {
   min-height: 1.35em;
 }
 
+.bottom-cards-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 2fr);
+  gap: var(--gap);
+  align-items: stretch;
+}
+
 .basic-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--gap);
+  gap: clamp(4px, 1.1vw, 6px);
+  align-items: stretch;
 }
 
 .action-btn {
-  min-height: clamp(50px, 9.4vh, 68px);
+  min-height: clamp(64px, 11.2vh, 88px);
   position: relative;
   font-size: var(--fs-sm);
   display: grid;
@@ -671,9 +686,15 @@ body {
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   background-color: transparent;
-  background-image: var(--badge-image);
-  background-size: 100% 100%;
+  background-image: var(--cost-icon-image);
+  background-size: contain;
+  background-position: center;
   background-repeat: no-repeat;
+  min-width: 22px;
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 }
 
 .cards-note {
@@ -841,6 +862,27 @@ body {
   100% {
     transform: scale(1);
     background-color: transparent;
+  }
+}
+
+@keyframes panelTurnPulse {
+  0% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(129, 182, 76, 0.28),
+      0 0 10px rgba(129, 182, 76, 0.16);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(129, 182, 76, 0.38),
+      0 0 18px rgba(129, 182, 76, 0.28);
+  }
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(129, 182, 76, 0.28),
+      0 0 10px rgba(129, 182, 76, 0.16);
   }
 }
 
