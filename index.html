@@ -116,6 +116,7 @@
         <section class="panel current-action-panel">
           <h3 class="panel-subtitle">Current Action</h3>
           <p id="currentActionText" class="current-action-text">Ready.</p>
+          <button id="draftAcceptBtn" class="btn mode-btn draft-accept-btn hidden" type="button">ACCEPT</button>
         </section>
 
         <section id="bottomPanel" class="panel player-panel">
@@ -198,6 +199,11 @@
 Goal:
 Reduce opponent HP to 0.
 
+Pre-match swap phase:
+Both players get 4 random characters.
+Select 0-4 cards to swap, then tap ACCEPT.
+Phase ends when both accept or timer expires.
+
 Turn order:
 Each round has 2 actions (one per player).
 At turn start, the acting player is:
@@ -206,7 +212,7 @@ At turn start, the acting player is:
 3) If tied -> alternate
 
 Bluff system:
-You may play any of your 4 role cards (even fake).
+Play any of your 4 cards (real or fake).
 Opponent must ACCEPT or YOU'RE LYING!.
 
 You're lying! resolution:
@@ -214,14 +220,21 @@ If role was REAL -> caller loses 1 HP, effect applies.
 If role was FAKE -> actor loses 2 HP, effect canceled.
 If you hold ELF and defend successfully -> gain +1 Gold.
 
-Roles:
+Characters:
 SIREN -> skip opponent next action
 DWARF -> shield next damage (1 Gold)
 KNIGHT -> 2 damage (2 Gold)
-GOBLIN -> steal 1 Gold (max 3 uses)
+GOBLIN -> steal 1 Gold (max 3)
 ENT -> heal 2 HP (2 Gold)
-PIRATE -> 1 damage +1 Gold (max 2 uses)
-ELF -> passive bonus
+PIRATE -> 1 damage +1 Gold (max 2)
+ELF -> passive +1 Gold on defend
+SCIENTIST -> +1 Gold and reveal one unknown enemy card (max 2)
+JOKER -> 1 damage (1 Gold), then transforms
+BERSERK -> self -1 HP, enemy -2 HP
+BANKER -> passive +1 Gold at round start
+ANGEL -> swap HP and Gold (1 Gold, max 1)
+VALKYRIE -> enemy -1 HP, self +1 HP (3 Gold)
+APPRENTICE -> X damage, cost X+1, scales each round (cap 5/6)
 
 Basic:
 INTEREST -> +1 Gold

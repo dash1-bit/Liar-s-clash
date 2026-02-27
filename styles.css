@@ -456,6 +456,37 @@ body {
   cursor: pointer;
 }
 
+.role-card.draft-selectable {
+  cursor: pointer;
+}
+
+.role-card.draft-selected {
+  opacity: 0.74;
+  animation: draftCardShake 440ms ease-in-out infinite;
+}
+
+.role-card.draft-selected .card-art {
+  filter: brightness(0.62);
+}
+
+.role-card.draft-selected::after {
+  content: "SWAP";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(1rem, 3.5vw, 1.26rem);
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.role-card.draft-swapping {
+  animation: draftSwapFade 420ms ease-in-out 1;
+}
+
 .role-card.real-role {
   border-color: rgba(129, 182, 76, 0.65);
 }
@@ -638,6 +669,11 @@ body {
   text-align: center;
 }
 
+.draft-accept-btn {
+  margin-top: 4px;
+  min-height: 44px;
+}
+
 .panel-subtitle {
   margin: 0;
   font-size: var(--fs-xs);
@@ -739,6 +775,10 @@ body {
   font-size: var(--fs-xs);
   color: var(--muted);
   line-height: 1.15;
+}
+
+.app-root.draft-open #bottomPanel .basic-actions {
+  display: none;
 }
 
 .response-overlay {
@@ -923,6 +963,36 @@ body {
       inset 0 1px 0 rgba(255, 255, 255, 0.05),
       0 0 0 1px rgba(129, 182, 76, 0.28),
       0 0 10px rgba(129, 182, 76, 0.16);
+  }
+}
+
+@keyframes draftCardShake {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-1px);
+  }
+  50% {
+    transform: translateX(1px);
+  }
+  75% {
+    transform: translateX(-1px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes draftSwapFade {
+  0% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 1;
   }
 }
 

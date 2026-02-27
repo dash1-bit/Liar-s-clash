@@ -2,6 +2,10 @@
 
 const PHASES = Object.freeze({
   idle: "idle",
+  draft: "draft",
+  awaitingDraftOpponent: "awaitingDraftOpponent",
+  draftReveal: "draftReveal",
+  gameStart: "gameStart",
   choosingAction: "choosingAction",
   awaitingResponse: "awaitingResponse",
   resolvingDelay: "resolvingDelay",
@@ -39,7 +43,14 @@ const ROLE_CONFIG = Object.freeze({
   GOBLIN: Object.freeze({ name: "GOBLIN", cost: 0, description: "Steal 1 Gold", maxUses: 3, passive: false }),
   ENT: Object.freeze({ name: "ENT", cost: 2, description: "+2 HP", passive: false }),
   ELF: Object.freeze({ name: "ELF", cost: 0, description: "Passive: +1 Gold on defend", passive: true }),
-  PIRATE: Object.freeze({ name: "PIRATE", cost: 0, description: "1 DMG +1 Gold", maxUses: 2, passive: false })
+  PIRATE: Object.freeze({ name: "PIRATE", cost: 0, description: "1 DMG +1 Gold", maxUses: 2, passive: false }),
+  SCIENTIST: Object.freeze({ name: "SCIENTIST", cost: 0, description: "+1 Gold + reveal unknown card", maxUses: 2, passive: false }),
+  JOKER: Object.freeze({ name: "JOKER", cost: 1, description: "1 DMG then transform", passive: false }),
+  BERSERK: Object.freeze({ name: "BERSERK", cost: 0, description: "Self -1 HP, enemy -2 HP", passive: false }),
+  BANKER: Object.freeze({ name: "BANKER", cost: 2, description: "Passive: +1 Gold each round", passive: true }),
+  ANGEL: Object.freeze({ name: "ANGEL", cost: 1, description: "Swap HP and Gold", maxUses: 1, passive: false }),
+  VALK: Object.freeze({ name: "VALK", cost: 3, description: "Enemy -1 HP, self +1 HP", passive: false }),
+  APPRENTICE: Object.freeze({ name: "APPRENTICE", cost: 2, description: "Scales each round", passive: false, apprentice: true })
 });
 
 const BASIC_ACTIONS = Object.freeze({
@@ -61,7 +72,14 @@ const ASSET_MAP = Object.freeze({
     GOBLIN: "./Recursos/Goblin.png",
     ELF: "./Recursos/Elf.png",
     ENT: "./Recursos/Ent.png",
-    PIRATE: "./Recursos/Pirate.png"
+    PIRATE: "./Recursos/Pirate.png",
+    SCIENTIST: "./Recursos/Scientist.png",
+    JOKER: "./Recursos/joker.png",
+    BERSERK: "./Recursos/Berserk.png",
+    BANKER: "./Recursos/bank.png",
+    ANGEL: "./Recursos/angel.png",
+    VALK: "./Recursos/Valk.png",
+    APPRENTICE: "./Recursos/mage.png"
   }),
   iconPaths: Object.freeze({
     hp: "./Recursos/HP.png",
@@ -122,6 +140,7 @@ const state = {
   previousRoundStarter: null,
   currentActor: null,
   startingActor: "human",
+  matchSeed: "",
   lastPerformedActor: null,
   thinking: false,
   matchWinner: null,
@@ -130,6 +149,7 @@ const state = {
   pendingResponder: null,
   pendingChallengeResult: null,
   pendingClaim: null,
+  draft: createDraftState(),
   currentActionText: "Ready.",
   events: [],
   resolutionToken: 0,
@@ -508,6 +528,30 @@ const net = {
       }
     }
 
+    if (payload.kind === "DRAFT_ACCEPT") {
+      if (state.screen !== APP_SCREENS.game) return;
+      if (!isDraftPhase()) return;
+      if (payload.actorSlot !== "human" && payload.actorSlot !== "bot") return;
+      if (!state.slots[payload.actorSlot] || state.slots[payload.actorSlot].id !== msg.senderId) return;
+      if (state.draft && state.draft.accepted && state.draft.accepted[payload.actorSlot]) return;
+
+      await this.sendEvent(
+        "ACTION",
+        {
+          kind: "DRAFT_ACCEPT",
+          actorSlot: payload.actorSlot,
+          selected: normalizeDraftSelectionIndices(payload.selected),
+          forced: Boolean(payload.forced)
+        },
+        {
+          canonical: true,
+          actorId: state.slots[payload.actorSlot].id,
+          applyLocal: true
+        }
+      );
+      return;
+    }
+
     if (state.screen !== APP_SCREENS.game) return;
     if (state.phase !== PHASES.choosingAction) return;
     if (payload.actorSlot !== state.currentActor) return;
@@ -587,7 +631,29 @@ function createPlayerState(key) {
 }
 
 function createSuspicionMap() {
-  return { SIREN: 0.35, DWARF: 0.35, KNIGHT: 0.35, GOBLIN: 0.35, ENT: 0.35, PIRATE: 0.35 };
+  const map = {};
+  Object.values(ROLE_CONFIG).forEach((meta) => {
+    if (!meta.passive) map[meta.name] = 0.35;
+  });
+  return map;
+}
+
+function createDraftState() {
+  return {
+    selections: { human: [], bot: [] },
+    accepted: { human: false, bot: false },
+    revealUntilBySlot: { human: 0, bot: 0 },
+    initialRoles: { human: [], bot: [] },
+    finalizing: false
+  };
+}
+
+function createEmptyLoadout() {
+  return { realRoles: [], fakeRoles: [], cards: [] };
+}
+
+function generateMatchSeed() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 function createPlayerId() {
@@ -727,7 +793,7 @@ function appendText(node, text) {
   node.appendChild(document.createTextNode(String(text || "")));
 }
 
-function renderRoleDescription(node, role) {
+function renderRoleDescription(node, role, card = null) {
   if (!node) return;
   node.textContent = "";
 
@@ -767,6 +833,47 @@ function renderRoleDescription(node, role) {
       appendText(node, " +1 ");
       icon("gold");
       break;
+    case "SCIENTIST":
+      appendText(node, "+1 ");
+      icon("gold");
+      appendText(node, " + reveal");
+      break;
+    case "JOKER":
+      appendText(node, "1 ");
+      icon("sword");
+      appendText(node, " then transform");
+      break;
+    case "BERSERK":
+      appendText(node, "Self -1 ");
+      icon("hp");
+      appendText(node, ", enemy -2 ");
+      icon("hp");
+      break;
+    case "BANKER":
+      appendText(node, "Passive +1 ");
+      icon("gold");
+      appendText(node, " each round");
+      break;
+    case "ANGEL":
+      appendText(node, "Swap ");
+      icon("hp");
+      appendText(node, " and ");
+      icon("gold");
+      break;
+    case "VALK":
+      appendText(node, "Enemy -1 ");
+      icon("hp");
+      appendText(node, ", self +1 ");
+      icon("hp");
+      break;
+    case "APPRENTICE": {
+      const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+      const cost = clamp(typeof card?.apprenticeCost === "number" ? card.apprenticeCost : 2, 2, 6);
+      appendText(node, `${dmg} `);
+      icon("sword");
+      appendText(node, ` (Cost ${cost})`);
+      break;
+    }
     default:
       appendText(node, "Skip next turn");
       break;
@@ -874,7 +981,7 @@ function getInvalidActionFeedback(input) {
   const meta = getRoleMeta(card.role);
   if (!meta) return "Not your turn.";
   if (meta.passive) return "Passive ability cannot be played.";
-  if (player.gold < meta.cost) return "Not enough gold.";
+  if (player.gold < getRoleCost(card.role, card)) return "Not enough gold.";
   if (!canUseRoleByUses(state.localSlot, card.role)) return "Uses exhausted.";
   return null;
 }
@@ -1010,72 +1117,159 @@ function getPlayableRoles() {
 }
 
 function getAllRoles() {
-  const pool = [...getPlayableRoles(), "ELF"];
-  return pool.filter((item, idx, list) => list.indexOf(item) === idx);
+  return Object.keys(ROLE_CONFIG);
+}
+
+function normalizeDraftSelectionIndices(indices) {
+  if (!Array.isArray(indices)) return [];
+  const cleaned = indices
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value >= 0 && value < 4);
+  return Array.from(new Set(cleaned)).sort((a, b) => a - b);
+}
+
+function applyCardRoleDefaults(card, role) {
+  if (!card) return;
+  if (role === "APPRENTICE") {
+    card.apprenticeDamage = typeof card.apprenticeDamage === "number" ? clamp(card.apprenticeDamage, 1, 5) : 1;
+    card.apprenticeCost = typeof card.apprenticeCost === "number" ? clamp(card.apprenticeCost, 2, 6) : 2;
+    return;
+  }
+  card.apprenticeDamage = null;
+  card.apprenticeCost = null;
 }
 
 function createCard(role, isReal, index) {
-  return { role, isReal, index, revealedUsed: false, confirmed: false };
+  const card = {
+    role,
+    isReal,
+    index,
+    revealedUsed: false,
+    confirmed: false,
+    verification: null,
+    apprenticeDamage: null,
+    apprenticeCost: null
+  };
+  applyCardRoleDefaults(card, role);
+  return card;
 }
 
 function pickUnique(pool, count, rng = Math.random) {
   return shuffle(pool, rng).slice(0, count);
 }
 
-function buildLoadoutForPlayer(rng, shuffleCards) {
-  const allPool = getAllRoles();
-  const fakePool = getPlayableRoles();
-  const realRoles = pickUnique(allPool, 2, rng);
-  const fakeRoles = pickUnique(
-    fakePool.filter((role) => !realRoles.includes(role)),
-    2,
-    rng
-  );
+function rolesFromCards(cards) {
+  const realRoles = [];
+  const fakeRoles = [];
+  cards.forEach((card) => {
+    if (!card) return;
+    if (card.isReal) realRoles.push(card.role);
+    else fakeRoles.push(card.role);
+  });
+  return { realRoles, fakeRoles };
+}
 
-  const cards = [];
-  realRoles.forEach((role, idx) => cards.push(createCard(role, true, idx)));
-  fakeRoles.forEach((role, idx) => cards.push(createCard(role, false, idx + 2)));
+function createDraftLoadoutFromRoles(roles) {
+  const normalizedRoles = Array.isArray(roles) ? roles.slice(0, 4) : [];
+  const cards = normalizedRoles.map((role, index) => createCard(role, false, index));
+  return { realRoles: [], fakeRoles: [], cards };
+}
 
-  const ordered = shuffleCards ? shuffle(cards, rng) : cards;
-  const normalized = ordered.map((card, index) => ({ ...card, index }));
+function assignTruthToCards(cards, rng) {
+  if (!Array.isArray(cards) || cards.length < 4) return;
+  const realIndices = new Set(pickUnique([0, 1, 2, 3], 2, rng));
+  cards.forEach((card, index) => {
+    card.isReal = realIndices.has(index);
+    card.revealedUsed = false;
+    card.confirmed = false;
+    card.verification = null;
+  });
+}
 
+function buildDraftRolesForPlayer(rng) {
+  return pickUnique(getAllRoles(), 4, rng);
+}
+
+function buildDeterministicDraftRoles(seedText) {
+  const rngHuman = createSeededRng(`${seedText}:draft:human`);
+  const rngBot = createSeededRng(`${seedText}:draft:bot`);
   return {
-    realRoles,
-    fakeRoles,
-    cards: normalized
+    human: buildDraftRolesForPlayer(rngHuman),
+    bot: buildDraftRolesForPlayer(rngBot)
   };
 }
 
-function buildDeterministicLoadout(seedText) {
-  const rngHuman = createSeededRng(`${seedText}:human`);
-  const rngBot = createSeededRng(`${seedText}:bot`);
+function buildDraftSwapResult(initialRoles, selectedIndices, seedText) {
+  const roles = Array.isArray(initialRoles) ? initialRoles.slice(0, 4) : [];
+  const picks = normalizeDraftSelectionIndices(selectedIndices);
+  if (picks.length === 0) return roles;
+
+  picks.forEach((index, step) => {
+    const current = new Set(roles);
+    const available = getAllRoles().filter((role) => !current.has(role));
+    if (available.length === 0) return;
+    const rng = createSeededRng(`${seedText}:${step}:${index}`);
+    const nextRole = available[Math.floor(rng() * available.length)];
+    roles[index] = nextRole;
+  });
+
+  return roles;
+}
+
+function buildFinalLoadoutFromDraftRoles(draftRoles, seedText, playerKey) {
+  const roles = Array.isArray(draftRoles) ? draftRoles.slice(0, 4) : [];
+  const loadout = createDraftLoadoutFromRoles(roles);
+  const rng = createSeededRng(`${seedText}:truth:${playerKey}`);
+  assignTruthToCards(loadout.cards, rng);
+  const groups = rolesFromCards(loadout.cards);
+  loadout.realRoles = groups.realRoles;
+  loadout.fakeRoles = groups.fakeRoles;
+  return loadout;
+}
+
+function buildDeterministicFinalLoadout(seedText, draftRoles) {
+  const roles = draftRoles || { human: [], bot: [] };
   return {
-    human: buildLoadoutForPlayer(rngHuman, true),
-    bot: buildLoadoutForPlayer(rngBot, true)
+    human: buildFinalLoadoutFromDraftRoles(roles.human, seedText, "human"),
+    bot: buildFinalLoadoutFromDraftRoles(roles.bot, seedText, "bot")
   };
 }
 
 function applyLoadoutToPlayer(playerKey, loadout) {
   const player = state.players[playerKey];
   if (!player || !loadout) return;
-  player.realRoles = Array.isArray(loadout.realRoles) ? [...loadout.realRoles] : [];
-  player.fakeRoles = Array.isArray(loadout.fakeRoles) ? [...loadout.fakeRoles] : [];
+
   player.cards = Array.isArray(loadout.cards)
-    ? loadout.cards.map((card, idx) => ({
-        role: card.role,
-        isReal: Boolean(card.isReal),
-        index: idx,
-        revealedUsed: Boolean(card.revealedUsed),
-        confirmed: Boolean(card.confirmed)
-      }))
+    ? loadout.cards.map((card, idx) => {
+        const verification = card.verification === "REAL" || card.verification === "FAKE" ? card.verification : card.confirmed ? "REAL" : null;
+        return {
+          role: card.role,
+          isReal: Boolean(card.isReal),
+          index: idx,
+          revealedUsed: Boolean(card.revealedUsed),
+          confirmed: verification === "REAL",
+          verification,
+          apprenticeDamage: typeof card.apprenticeDamage === "number" ? card.apprenticeDamage : null,
+          apprenticeCost: typeof card.apprenticeCost === "number" ? card.apprenticeCost : null
+        };
+      })
     : [];
+
+  player.cards.forEach((card) => {
+    applyCardRoleDefaults(card, card.role);
+  });
+
+  const groups = rolesFromCards(player.cards);
+  player.realRoles = Array.isArray(loadout.realRoles) && loadout.realRoles.length > 0 ? [...loadout.realRoles] : groups.realRoles;
+  player.fakeRoles = Array.isArray(loadout.fakeRoles) && loadout.fakeRoles.length > 0 ? [...loadout.fakeRoles] : groups.fakeRoles;
 }
 
 function assignRandomRolesForBotMatch() {
-  const humanPack = buildLoadoutForPlayer(Math.random, false);
-  const botPack = buildLoadoutForPlayer(Math.random, true);
-  applyLoadoutToPlayer("human", humanPack);
-  applyLoadoutToPlayer("bot", botPack);
+  const seed = generateMatchSeed();
+  const draft = buildDeterministicDraftRoles(seed);
+  const finalLoadout = buildDeterministicFinalLoadout(seed, draft);
+  applyLoadoutToPlayer("human", finalLoadout.human);
+  applyLoadoutToPlayer("bot", finalLoadout.bot);
 }
 
 function getRoleUsesLeft(playerKey, role) {
@@ -1097,6 +1291,111 @@ function consumeRoleUse(playerKey, role) {
   player.roleUses[role] = (player.roleUses[role] || 0) + 1;
 }
 
+function syncPlayerRoleLists(playerKey) {
+  const player = state.players[playerKey];
+  if (!player) return;
+  const groups = rolesFromCards(player.cards || []);
+  player.realRoles = groups.realRoles;
+  player.fakeRoles = groups.fakeRoles;
+}
+
+function getCardByIndex(playerKey, cardIndex) {
+  const player = state.players[playerKey];
+  if (!player || !Array.isArray(player.cards)) return null;
+  return player.cards[cardIndex] || null;
+}
+
+function getRoleCost(role, card) {
+  if (role === "APPRENTICE") return clamp(typeof card?.apprenticeCost === "number" ? card.apprenticeCost : 2, 2, 6);
+  const meta = getRoleMeta(role);
+  return meta ? meta.cost : 0;
+}
+
+function getRoleEffectSummary(role, card) {
+  if (role === "APPRENTICE") {
+    const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+    const cost = clamp(typeof card?.apprenticeCost === "number" ? card.apprenticeCost : 2, 2, 6);
+    return `${dmg} DMG (cost ${cost})`;
+  }
+  const meta = getRoleMeta(role);
+  return meta ? meta.description : "";
+}
+
+function deterministicPickIndex(length, context) {
+  if (!Number.isFinite(length) || length <= 0) return -1;
+  const seed = `${state.matchSeed || "match"}:${context}`;
+  const rng = createSeededRng(seed);
+  return Math.floor(rng() * length);
+}
+
+function chooseScientistRevealIndex(targetKey, actorKey, cardIndex) {
+  const targetCards = state.players[targetKey].cards || [];
+  const unknown = [];
+  targetCards.forEach((card, idx) => {
+    if (!card) return;
+    if (card.verification === "REAL" || card.verification === "FAKE") return;
+    unknown.push(idx);
+  });
+  if (unknown.length === 0) return null;
+  const actorUses = state.players[actorKey].roleUses.SCIENTIST || 0;
+  const pick = deterministicPickIndex(
+    unknown.length,
+    `scientist:${actorKey}:${targetKey}:${state.round}:${state.roundActionCounter}:${cardIndex}:${actorUses}`
+  );
+  return pick >= 0 ? unknown[pick] : unknown[0];
+}
+
+function revealCardVerification(targetKey, cardIndex, sourceLabel) {
+  const card = getCardByIndex(targetKey, cardIndex);
+  if (!card) return null;
+  const verification = card.isReal ? "REAL" : "FAKE";
+  card.revealedUsed = true;
+  card.verification = verification;
+  card.confirmed = verification === "REAL";
+  pushDebugLog(`${slotName(targetKey)} ${card.role} verified ${verification} (${sourceLabel}).`);
+  return card;
+}
+
+function replaceJokerCard(playerKey, cardIndex) {
+  const player = state.players[playerKey];
+  if (!player) return null;
+  const card = player.cards[cardIndex];
+  if (!card) return null;
+
+  const currentRoles = player.cards.map((item) => item.role);
+  const availableRoles = getAllRoles().filter((role) => role !== "JOKER" && !currentRoles.includes(role));
+  if (availableRoles.length === 0) return null;
+
+  const uses = player.roleUses.JOKER || 0;
+  const pick = deterministicPickIndex(availableRoles.length, `joker:${playerKey}:${state.round}:${state.roundActionCounter}:${cardIndex}:${uses}`);
+  const nextRole = availableRoles[pick >= 0 ? pick : 0];
+  card.role = nextRole;
+  applyCardRoleDefaults(card, card.role);
+  syncPlayerRoleLists(playerKey);
+  return nextRole;
+}
+
+function scaleApprenticeCardsForNewRound(playerKey) {
+  const player = state.players[playerKey];
+  if (!player || !Array.isArray(player.cards)) return;
+  player.cards.forEach((card) => {
+    if (!card || card.role !== "APPRENTICE") return;
+    const nextDamage = clamp((typeof card.apprenticeDamage === "number" ? card.apprenticeDamage : 1) + 1, 1, 5);
+    const nextCost = clamp((typeof card.apprenticeCost === "number" ? card.apprenticeCost : 2) + 1, 2, 6);
+    card.apprenticeDamage = nextDamage;
+    card.apprenticeCost = nextCost;
+  });
+}
+
+function applyRoundStartPassives() {
+  ["human", "bot"].forEach((playerKey) => {
+    if (playerHasRealRole(playerKey, "BANKER")) {
+      applyGold(playerKey, 1, "BANKER passive");
+    }
+    if (state.round > 1) scaleApprenticeCardsForNewRound(playerKey);
+  });
+}
+
 function resetMatchState(options = {}) {
   clearTimer();
   cancelResolutionQueue();
@@ -1114,6 +1413,8 @@ function resetMatchState(options = {}) {
   }
 
   state.phase = PHASES.idle;
+  state.matchSeed = String(options.matchSeed || state.matchSeed || generateMatchSeed());
+  state.draft = createDraftState();
   state.round = 1;
   state.roundActionCounter = 0;
   state.roundStarter = null;
@@ -1158,6 +1459,8 @@ async function backToMenu() {
   state.pendingResponder = null;
   state.pendingChallengeResult = null;
   clearPendingClaim();
+  state.draft = createDraftState();
+  state.matchSeed = "";
   state.friend.pendingRequest = null;
   state.friend.startInFlight = false;
 
@@ -1214,11 +1517,30 @@ function startBotMatch() {
   state.slots.bot = { id: "bot-ai", name: "Bot", avatarId: "avatar-bot" };
   state.localSlot = "human";
 
-  resetMatchState();
-  state.screen = APP_SCREENS.game;
-  setCurrentAction("Match started.");
-  updateUI();
-  setTimeout(() => beginTurn(), 220);
+  const matchSeed = generateMatchSeed();
+  const starterRng = createSeededRng(`${matchSeed}:starter`);
+  const draftRoles = buildDeterministicDraftRoles(matchSeed);
+  const payload = {
+    stage: "draft-start",
+    matchSeed,
+    startingActor: starterRng() < 0.5 ? "human" : "bot",
+    players: {
+      human: {
+        id: state.slots.human.id,
+        name: state.slots.human.name,
+        avatarId: state.slots.human.avatarId,
+        draftRoles: draftRoles.human
+      },
+      bot: {
+        id: state.slots.bot.id,
+        name: state.slots.bot.name,
+        avatarId: state.slots.bot.avatarId,
+        draftRoles: draftRoles.bot
+      }
+    }
+  };
+
+  applyFriendStart(payload);
 }
 
 function prepareFriendRoomState(roomId, role) {
@@ -1300,11 +1622,12 @@ function buildFriendStartPayload() {
   const [guestId, guestPresenceRaw] = guestEntry;
   const guestPresence = guestPresenceRaw || { name: "Guest", avatarId: "avatar-2" };
 
-  const seed = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  const loadout = buildDeterministicLoadout(seed);
+  const seed = generateMatchSeed();
+  const draftRoles = buildDeterministicDraftRoles(seed);
   const starterRng = createSeededRng(`${seed}:starter`);
 
   return {
+    stage: "draft-start",
     matchSeed: seed,
     startingActor: starterRng() < 0.5 ? "human" : "bot",
     players: {
@@ -1312,17 +1635,13 @@ function buildFriendStartPayload() {
         id: net.playerId,
         name: safePlayerName(hostPresence.name),
         avatarId: normalizeAvatarId(hostPresence.avatarId),
-        realRoles: loadout.human.realRoles,
-        fakeRoles: loadout.human.fakeRoles,
-        cards: loadout.human.cards
+        draftRoles: draftRoles.human
       },
       bot: {
         id: guestId,
         name: safePlayerName(guestPresence.name),
         avatarId: normalizeAvatarId(guestPresence.avatarId),
-        realRoles: loadout.bot.realRoles,
-        fakeRoles: loadout.bot.fakeRoles,
-        cards: loadout.bot.cards
+        draftRoles: draftRoles.bot
       }
     }
   };
@@ -1350,10 +1669,16 @@ async function startFriendMatchAsHost() {
 function applyFriendStart(payload) {
   if (!payload || !payload.players || !payload.players.human || !payload.players.bot) return;
 
-  state.mode = "friend";
+  if (payload.stage === "draft-final") {
+    applyDraftFinalStart(payload);
+    return;
+  }
+
+  if (!payload.players.human.draftRoles || !payload.players.bot.draftRoles) return;
+  if (!state.mode) state.mode = "friend";
   state.friend.startInFlight = false;
   state.friend.errorMessage = "";
-  state.friend.connectionStatus = "Match started";
+  state.friend.connectionStatus = "Draft started";
 
   state.slots.human = {
     id: payload.players.human.id,
@@ -1369,18 +1694,298 @@ function applyFriendStart(payload) {
   state.localSlot = state.slots.human.id === net.playerId ? "human" : "bot";
   net.hostId = state.slots.human.id;
 
+  const startSeed = String(payload.matchSeed || generateMatchSeed());
+  const startLoadout = {
+    human: createDraftLoadoutFromRoles(payload.players.human.draftRoles),
+    bot: createDraftLoadoutFromRoles(payload.players.bot.draftRoles)
+  };
+
   resetMatchState({
     startingActor: payload.startingActor,
+    loadout: startLoadout,
+    matchSeed: startSeed
+  });
+
+  state.phase = PHASES.draft;
+  state.screen = APP_SCREENS.game;
+  state.draft = createDraftState();
+  state.draft.initialRoles.human = [...payload.players.human.draftRoles];
+  state.draft.initialRoles.bot = [...payload.players.bot.draftRoles];
+
+  if (state.mode === "bot") {
+    const botSelections = buildBotDraftSelections(startSeed);
+    state.draft.selections.bot = [...botSelections];
+    setTimeout(() => {
+      if (state.mode === "bot" && state.phase === PHASES.draft) {
+        applyCanonicalDraftAccept({ kind: "DRAFT_ACCEPT", actorSlot: "bot", selected: botSelections, forced: false });
+      }
+    }, 260);
+  }
+
+  setCurrentAction("Draft phase: select up to 4 cards to swap and tap ACCEPT.");
+  startDraftTimer();
+  updateUI();
+}
+
+function isDraftPhase(phase = state.phase) {
+  return phase === PHASES.draft || phase === PHASES.awaitingDraftOpponent || phase === PHASES.draftReveal;
+}
+
+function isDraftSelectionPhase() {
+  return state.phase === PHASES.draft || state.phase === PHASES.awaitingDraftOpponent;
+}
+
+function getDraftSelectionsForSlot(slot) {
+  if (!state.draft || !state.draft.selections) return [];
+  return normalizeDraftSelectionIndices(state.draft.selections[slot]);
+}
+
+function setDraftSelectionsForSlot(slot, selections) {
+  if (!state.draft) state.draft = createDraftState();
+  state.draft.selections[slot] = normalizeDraftSelectionIndices(selections);
+}
+
+function allDraftAccepted() {
+  return Boolean(state.draft && state.draft.accepted && state.draft.accepted.human && state.draft.accepted.bot);
+}
+
+function startDraftTimer() {
+  if (!isDraftPhase()) return;
+  runHumanTimer("draft", MATCH_SETTINGS.HUMAN_TIMER_SECONDS, () => handleDraftTimeout(state.localSlot));
+}
+
+function buildBotDraftSelections(seed) {
+  const rng = createSeededRng(`${seed}:bot-swap`);
+  const count = Math.floor(rng() * 3);
+  return normalizeDraftSelectionIndices(pickUnique([0, 1, 2, 3], count, rng));
+}
+
+async function submitLocalDraftAccept(forced = false) {
+  if (!isDraftSelectionPhase()) return;
+  const actorSlot = state.localSlot;
+  if (!actorSlot || state.draft.accepted[actorSlot]) return;
+  const selected = getDraftSelectionsForSlot(actorSlot);
+
+  if (state.mode === "friend") {
+    if (net.role === "host") {
+      await net.sendEvent(
+        "ACTION",
+        {
+          kind: "DRAFT_ACCEPT",
+          actorSlot,
+          selected,
+          forced
+        },
+        {
+          canonical: true,
+          actorId: state.slots[actorSlot].id,
+          applyLocal: true
+        }
+      );
+      return;
+    }
+
+    state.friend.pendingRequest = "draft";
+    clearTimer();
+    updateUI();
+    await net.sendEvent(
+      "ACTION",
+      {
+        kind: "DRAFT_ACCEPT",
+        actorSlot,
+        selected,
+        forced,
+        requestId: `${net.playerId}-${Date.now()}-d`
+      },
+      {
+        actorId: state.slots[actorSlot].id,
+        seq: 0
+      }
+    );
+    return;
+  }
+
+  applyCanonicalDraftAccept({ kind: "DRAFT_ACCEPT", actorSlot, selected, forced });
+}
+
+function getDraftFinalizeDelay() {
+  if (!state.draft || !state.draft.revealUntilBySlot) return 0;
+  const until = Math.max(
+    Number(state.draft.revealUntilBySlot.human) || 0,
+    Number(state.draft.revealUntilBySlot.bot) || 0
+  );
+  return Math.max(0, until - Date.now());
+}
+
+function buildDraftFinalPayload() {
+  const seed = String(state.matchSeed || generateMatchSeed());
+  const finalRoles = {
+    human: buildDraftSwapResult(state.draft.initialRoles.human, getDraftSelectionsForSlot("human"), `${seed}:swap:human`),
+    bot: buildDraftSwapResult(state.draft.initialRoles.bot, getDraftSelectionsForSlot("bot"), `${seed}:swap:bot`)
+  };
+  const finalLoadout = buildDeterministicFinalLoadout(seed, finalRoles);
+  return {
+    stage: "draft-final",
+    matchSeed: seed,
+    startingActor: state.startingActor,
+    players: {
+      human: {
+        id: state.slots.human.id,
+        name: safePlayerName(state.slots.human.name),
+        avatarId: normalizeAvatarId(state.slots.human.avatarId),
+        realRoles: finalLoadout.human.realRoles,
+        fakeRoles: finalLoadout.human.fakeRoles,
+        cards: finalLoadout.human.cards
+      },
+      bot: {
+        id: state.slots.bot.id,
+        name: safePlayerName(state.slots.bot.name),
+        avatarId: normalizeAvatarId(state.slots.bot.avatarId),
+        realRoles: finalLoadout.bot.realRoles,
+        fakeRoles: finalLoadout.bot.fakeRoles,
+        cards: finalLoadout.bot.cards
+      }
+    }
+  };
+}
+
+function applyDraftFinalStart(payload) {
+  if (!payload || !payload.players || !payload.players.human || !payload.players.bot) return;
+  state.friend.pendingRequest = null;
+  state.friend.startInFlight = false;
+  clearTimer();
+
+  state.slots.human = {
+    id: payload.players.human.id,
+    name: safePlayerName(payload.players.human.name),
+    avatarId: normalizeAvatarId(payload.players.human.avatarId)
+  };
+  state.slots.bot = {
+    id: payload.players.bot.id,
+    name: safePlayerName(payload.players.bot.name),
+    avatarId: normalizeAvatarId(payload.players.bot.avatarId)
+  };
+  state.localSlot = state.slots.human.id === net.playerId ? "human" : "bot";
+  net.hostId = state.slots.human.id;
+
+  resetMatchState({
+    startingActor: payload.startingActor,
+    matchSeed: payload.matchSeed,
     loadout: {
       human: payload.players.human,
       bot: payload.players.bot
     }
   });
 
+  state.phase = PHASES.gameStart;
   state.screen = APP_SCREENS.game;
-  setCurrentAction("Match started.");
+  setCurrentAction("Draft complete. Match started.");
   updateUI();
-  setTimeout(() => beginTurn(), 200);
+  setTimeout(() => beginTurn(), 220);
+}
+
+async function finalizeDraftIfReady() {
+  if (!isDraftPhase()) return;
+  if (!allDraftAccepted()) return;
+  if (!state.draft || state.draft.finalizing) return;
+  state.draft.finalizing = true;
+  state.phase = PHASES.draftReveal;
+  updateUI();
+
+  const delay = Math.max(220, getDraftFinalizeDelay());
+  setTimeout(async () => {
+    const payload = buildDraftFinalPayload();
+    if (state.mode === "friend") {
+      if (net.role !== "host") return;
+      await net.sendEvent("START", payload, {
+        canonical: true,
+        actorId: net.playerId,
+        applyLocal: true
+      });
+      return;
+    }
+    applyDraftFinalStart(payload);
+  }, delay);
+}
+
+function applyCanonicalDraftAccept(payload) {
+  if (!payload || !isDraftPhase()) return;
+  const actorSlot = payload.actorSlot === "bot" ? "bot" : "human";
+  if (state.draft && state.draft.accepted && state.draft.accepted[actorSlot]) return;
+  const selected = normalizeDraftSelectionIndices(payload.selected);
+  setDraftSelectionsForSlot(actorSlot, selected);
+  state.draft.accepted[actorSlot] = true;
+  state.draft.revealUntilBySlot[actorSlot] = Date.now() + 420;
+  state.friend.pendingRequest = null;
+
+  if (state.localSlot === actorSlot) state.phase = PHASES.awaitingDraftOpponent;
+  if (allDraftAccepted()) state.phase = PHASES.draftReveal;
+  setCurrentAction(`${slotName(actorSlot)} accepted ${selected.length} swap${selected.length === 1 ? "" : "s"}.`);
+  updateUI();
+
+  void finalizeDraftIfReady();
+}
+
+function handleDraftTimeout() {
+  if (!isDraftPhase()) return;
+
+  if (state.mode === "friend") {
+    if (net.role === "host") {
+      const pendingSlots = ["human", "bot"].filter((slot) => !state.draft.accepted[slot]);
+      pendingSlots.forEach((slot) => {
+        void net.sendEvent(
+          "ACTION",
+          {
+            kind: "DRAFT_ACCEPT",
+            actorSlot: slot,
+            selected: getDraftSelectionsForSlot(slot),
+            forced: true
+          },
+          {
+            canonical: true,
+            actorId: state.slots[slot].id,
+            applyLocal: true
+          }
+        );
+      });
+      return;
+    }
+
+    if (!state.draft.accepted[state.localSlot]) {
+      setCurrentAction("Draft timer expired. Waiting for host...");
+      void submitLocalDraftAccept(true);
+    }
+    return;
+  }
+
+  if (!state.draft.accepted[state.localSlot]) {
+    applyCanonicalDraftAccept({
+      kind: "DRAFT_ACCEPT",
+      actorSlot: state.localSlot,
+      selected: getDraftSelectionsForSlot(state.localSlot),
+      forced: true
+    });
+  }
+}
+
+function isDraftCardSelectable(ownerSlot) {
+  if (!isDraftSelectionPhase()) return false;
+  if (state.screen !== APP_SCREENS.game) return false;
+  if (ownerSlot !== state.localSlot) return false;
+  if (!state.draft || state.draft.accepted[ownerSlot]) return false;
+  return true;
+}
+
+function isDraftCardSelected(ownerSlot, cardIndex) {
+  if (!state.draft || !state.draft.selections) return false;
+  return getDraftSelectionsForSlot(ownerSlot).includes(cardIndex);
+}
+
+function isDraftCardSwapping(ownerSlot, cardIndex) {
+  if (!state.draft || !state.draft.revealUntilBySlot) return false;
+  const until = Number(state.draft.revealUntilBySlot[ownerSlot]) || 0;
+  if (until <= Date.now()) return false;
+  return getDraftSelectionsForSlot(ownerSlot).includes(cardIndex);
 }
 
 function buildSyncSnapshot() {
@@ -1411,6 +2016,8 @@ function buildSyncSnapshot() {
     mode: state.mode,
     screen: state.screen,
     phase: state.phase,
+    matchSeed: state.matchSeed,
+    draft: state.draft,
     round: state.round,
     roundActionCounter: state.roundActionCounter,
     roundStarter: state.roundStarter,
@@ -1444,6 +2051,28 @@ function applySyncPayload(payload) {
   state.mode = "friend";
   state.screen = snap.screen;
   state.phase = snap.phase;
+  state.matchSeed = String(snap.matchSeed || state.matchSeed || generateMatchSeed());
+  state.draft = snap.draft
+    ? {
+        selections: {
+          human: normalizeDraftSelectionIndices(snap.draft.selections && snap.draft.selections.human),
+          bot: normalizeDraftSelectionIndices(snap.draft.selections && snap.draft.selections.bot)
+        },
+        accepted: {
+          human: Boolean(snap.draft.accepted && snap.draft.accepted.human),
+          bot: Boolean(snap.draft.accepted && snap.draft.accepted.bot)
+        },
+        revealUntilBySlot: {
+          human: Number(snap.draft.revealUntilBySlot && snap.draft.revealUntilBySlot.human) || 0,
+          bot: Number(snap.draft.revealUntilBySlot && snap.draft.revealUntilBySlot.bot) || 0
+        },
+        initialRoles: {
+          human: Array.isArray(snap.draft.initialRoles && snap.draft.initialRoles.human) ? snap.draft.initialRoles.human.slice(0, 4) : [],
+          bot: Array.isArray(snap.draft.initialRoles && snap.draft.initialRoles.bot) ? snap.draft.initialRoles.bot.slice(0, 4) : []
+        },
+        finalizing: Boolean(snap.draft.finalizing)
+      }
+    : createDraftState();
   state.round = Number(snap.round) || 1;
   state.roundActionCounter = Number(snap.roundActionCounter) || 0;
   state.roundStarter = snap.roundStarter || null;
@@ -1494,6 +2123,7 @@ function applySyncPayload(payload) {
     state.players.bot.roleUses = Object.assign(Object.create(null), snap.players.bot.roleUses || {});
   }
 
+  if (isDraftPhase()) startDraftTimer();
   updateUI();
 }
 
@@ -1596,6 +2226,10 @@ function beginTurn() {
     return;
   }
   if (concludeMatchByHp()) return;
+
+  if (state.roundActionCounter === 0) {
+    applyRoundStartPassives();
+  }
 
   const actor = actorForCurrentRoundAction();
   if (!actor) {
@@ -1714,15 +2348,17 @@ function normalizeActionInput(actor, input) {
     return null;
   }
 
+  const dynamicCost = getRoleCost(card.role, card);
+
   return {
     kind: "role",
     id: card.role,
     label: card.role,
     role: card.role,
     cardIndex,
-    cost: meta.cost,
+    cost: dynamicCost,
     challengeable: true,
-    description: meta.description
+    description: getRoleEffectSummary(card.role, card)
   };
 }
 
@@ -1734,7 +2370,7 @@ function isActionLegal(actor, action) {
 }
 
 function formatActionText(actor, action) {
-  return `${slotLabel(actor)} played ${action.label} (${action.description})`;
+  return `${slotName(actor)} played ${action.label} (${action.description})`;
 }
 
 function runResolutionAfterDelay(applyFn) {
@@ -1861,15 +2497,19 @@ function handleResponseTimeout(responder) {
   resolveAccept();
 }
 
-function markRoleReveal(playerKey, cardIndex, confirmed) {
+function markRoleReveal(playerKey, cardIndex, verification = null) {
   const card = state.players[playerKey].cards[cardIndex];
   if (!card) return;
   card.revealedUsed = true;
-  if (confirmed && card.isReal) card.confirmed = true;
+  const normalized = verification === "REAL" || verification === "FAKE" ? verification : null;
+  if (normalized) card.verification = normalized;
+  card.confirmed = card.verification === "REAL";
 }
 
 function playerHasRealRole(playerKey, role) {
-  return state.players[playerKey].realRoles.includes(role);
+  const player = state.players[playerKey];
+  if (!player || !Array.isArray(player.cards)) return false;
+  return player.cards.some((card) => card && card.isReal && card.role === role);
 }
 
 function adjustSuspicion(role, delta) {
@@ -1885,7 +2525,7 @@ function resolveAccept() {
   const action = state.pendingAction;
   if (!action) return;
 
-  if (typeof action.cardIndex === "number") markRoleReveal(action.actor, action.cardIndex, false);
+  if (typeof action.cardIndex === "number") markRoleReveal(action.actor, action.cardIndex);
   setCurrentAction(`ACCEPTED. ${slotName(action.actor)} resolves ${action.role}.`);
 
   runResolutionAfterDelay(() => {
@@ -1910,7 +2550,7 @@ function resolveChallenge() {
   const card = state.players[actor].cards[action.cardIndex];
   const isReal = Boolean(card && card.isReal);
 
-  markRoleReveal(actor, action.cardIndex, isReal);
+  markRoleReveal(actor, action.cardIndex, isReal ? "REAL" : "FAKE");
   state.pendingChallengeResult = { actor, challenger, role: action.role, isReal };
 
   if (isReal) {
@@ -1979,6 +2619,48 @@ function applyEffect(action) {
       applyDamage(target, 1, "PIRATE");
       applyGold(actor, 1, "PIRATE");
       break;
+    case "SCIENTIST": {
+      applyGold(actor, 1, "SCIENTIST");
+      const revealIndex = chooseScientistRevealIndex(target, actor, action.cardIndex);
+      if (revealIndex !== null) {
+        const revealed = revealCardVerification(target, revealIndex, "SCIENTIST");
+        if (revealed) {
+          const status = revealed.isReal ? "REAL" : "FAKE";
+          setCurrentAction(`${slotName(actor)} revealed ${slotName(target)} ${revealed.role}: ${status}.`);
+        }
+      }
+      break;
+    }
+    case "JOKER": {
+      applyDamage(target, 1, "JOKER");
+      const transformedInto = replaceJokerCard(actor, action.cardIndex);
+      if (transformedInto) {
+        setCurrentAction(`${slotName(actor)} transformed JOKER into ${transformedInto}.`);
+      }
+      break;
+    }
+    case "BERSERK":
+      applyDamage(actor, 1, "BERSERK recoil");
+      applyDamage(target, 2, "BERSERK");
+      break;
+    case "ANGEL": {
+      const actorState = state.players[actor];
+      const hp = actorState.hp;
+      actorState.hp = Math.max(0, actorState.gold);
+      actorState.gold = Math.max(0, hp);
+      triggerPlayerAnimation(actor, "heal");
+      break;
+    }
+    case "VALK":
+      applyDamage(target, 1, "VALK");
+      applyHeal(actor, 1, "VALK");
+      break;
+    case "APPRENTICE": {
+      const card = getCardByIndex(actor, action.cardIndex);
+      const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+      applyDamage(target, dmg, "APPRENTICE");
+      break;
+    }
     default:
       break;
   }
@@ -2044,7 +2726,8 @@ function gatherLegalActions(playerKey) {
   player.cards.forEach((card, cardIndex) => {
     const meta = getRoleMeta(card.role);
     if (!meta || meta.passive) return;
-    if (player.gold < meta.cost) return;
+    const dynamicCost = getRoleCost(card.role, card);
+    if (player.gold < dynamicCost) return;
     if (!canUseRoleByUses(playerKey, card.role)) return;
 
     actions.push({
@@ -2053,6 +2736,7 @@ function gatherLegalActions(playerKey) {
       role: card.role,
       label: card.role,
       cardIndex,
+      cost: dynamicCost,
       isReal: card.isReal,
       challengeable: true
     });
@@ -2123,6 +2807,34 @@ function scoreBotAction(action) {
     case "PIRATE":
       score += human.hp <= 2 ? 3.1 : 1.4;
       break;
+    case "SCIENTIST": {
+      const unknownCount = state.players.human.cards.filter(
+        (card) => card && card.verification !== "REAL" && card.verification !== "FAKE"
+      ).length;
+      score += 1.3 + unknownCount * 0.45;
+      break;
+    }
+    case "JOKER":
+      score += human.hp <= 2 ? 2.6 : 1.7;
+      break;
+    case "BERSERK":
+      score += human.hp <= 2 ? 2.4 : 1.2;
+      if (bot.hp <= 2) score -= 1.5;
+      break;
+    case "ANGEL":
+      if (bot.hp <= 2 && bot.gold >= 3) score += 3.4;
+      else score += 0.7;
+      break;
+    case "VALK":
+      score += bot.hp <= 3 ? 3.4 : 2.1;
+      break;
+    case "APPRENTICE": {
+      const card = getCardByIndex("bot", action.cardIndex);
+      const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+      score += dmg * 1.25;
+      if (human.hp <= dmg) score += 4.2;
+      break;
+    }
     default:
       break;
   }
@@ -2211,6 +2923,27 @@ function botShouldChallenge(action) {
     case "DWARF":
       preventedSwing = 1.2;
       break;
+    case "SCIENTIST":
+      preventedSwing = 1.6;
+      break;
+    case "JOKER":
+      preventedSwing = 1.9;
+      break;
+    case "BERSERK":
+      preventedSwing = 2.1;
+      break;
+    case "ANGEL":
+      preventedSwing = 2.2;
+      break;
+    case "VALK":
+      preventedSwing = 2.4;
+      break;
+    case "APPRENTICE": {
+      const card = getCardByIndex("human", action.cardIndex);
+      const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+      preventedSwing = 1.1 + dmg * 0.7;
+      break;
+    }
     default:
       break;
   }
@@ -2258,6 +2991,10 @@ async function botRespondToClaim() {
 
 function applyCanonicalAction(payload) {
   if (!payload || state.screen !== APP_SCREENS.game) return;
+  if (payload.kind === "DRAFT_ACCEPT") {
+    applyCanonicalDraftAccept(payload);
+    return;
+  }
   if (state.phase !== PHASES.choosingAction) return;
   if (payload.actorSlot !== state.currentActor) return;
   playAction(payload.input);
@@ -2383,6 +3120,11 @@ function submitLocalResponse(choice) {
 function getTurnIndicatorText() {
   if (state.screen !== APP_SCREENS.game) return "";
 
+  if (state.phase === PHASES.draft) return "Draft: select cards to swap, then tap ACCEPT";
+  if (state.phase === PHASES.awaitingDraftOpponent) return "Waiting for opponent draft accept...";
+  if (state.phase === PHASES.draftReveal) return "Applying swaps...";
+  if (state.phase === PHASES.gameStart) return "Preparing first turn...";
+
   if (state.phase === PHASES.choosingAction) {
     if (state.currentActor === state.localSlot) {
       if (state.friend.pendingRequest === "action") return "Waiting host confirmation...";
@@ -2439,13 +3181,17 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     node.dataset.cardIndex = String(cardIndex);
   }
 
+  const draftMode = isDraftPhase();
+
   if (ownerSlot === state.localSlot) {
-    node.classList.add(card.isReal ? "real-role" : "fake-role");
-    if (card.isReal) node.classList.add("real-role-highlight");
+    if (!draftMode) {
+      node.classList.add(card.isReal ? "real-role" : "fake-role");
+      if (card.isReal) node.classList.add("real-role-highlight");
+    }
   } else {
     node.classList.add("opponent-card");
-    if (card.confirmed) node.classList.add("opponent-confirmed");
-    else if (card.revealedUsed) node.classList.add("opponent-played");
+    if (card.verification === "REAL" || card.verification === "FAKE") node.classList.add("opponent-confirmed");
+    else if (!draftMode && card.revealedUsed) node.classList.add("opponent-played");
   }
 
   const pendingClaimCard = isPendingClaimCard(ownerSlot, card, cardIndex);
@@ -2454,6 +3200,14 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     if (state.pendingClaim && Date.now() - state.pendingClaim.timestamp <= 320) {
       node.classList.add("card--pending-claim-flash");
     }
+  }
+
+  if (isDraftCardSelectable(ownerSlot)) {
+    node.classList.add("draft-selectable");
+    if (isDraftCardSelected(ownerSlot, cardIndex)) node.classList.add("draft-selected");
+  }
+  if (isDraftCardSwapping(ownerSlot, cardIndex)) {
+    node.classList.add("draft-swapping");
   }
 
   const artLayer = document.createElement("span");
@@ -2467,6 +3221,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
   node.appendChild(textFade);
 
   const meta = getRoleMeta(card.role);
+  const roleCost = getRoleCost(card.role, card);
   const usesLeft = getRoleUsesLeft(ownerSlot, card.role);
   const badgeRow = document.createElement("div");
   badgeRow.className = "card-badge-row";
@@ -2484,19 +3239,19 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     hasBadge = true;
   }
 
-  if (ownerSlot !== state.localSlot && card.revealedUsed) {
+  if (ownerSlot !== state.localSlot && (card.verification === "REAL" || card.verification === "FAKE")) {
     const verifiedTag = document.createElement("span");
-    const verifiedIsReal = Boolean(card.confirmed);
+    const verifiedIsReal = card.verification === "REAL";
     verifiedTag.className = `card-badge card-status-tag ${verifiedIsReal ? "card-real-tag" : "card-fake-tag"}`;
     verifiedTag.textContent = verifiedIsReal ? "REAL" : "FAKE";
     badgeLeft.appendChild(verifiedTag);
     hasBadge = true;
   }
 
-  if (meta && meta.cost > 0) {
+  if (meta && roleCost > 0) {
     const cost = document.createElement("span");
     cost.className = "card-badge card-cost";
-    cost.textContent = String(meta.cost);
+    cost.textContent = String(roleCost);
     badgeRight.appendChild(cost);
     hasBadge = true;
   }
@@ -2533,7 +3288,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
 
   const desc = document.createElement("p");
   desc.className = "card-desc";
-  renderRoleDescription(desc, card.role);
+  renderRoleDescription(desc, card.role, card);
   textPanel.appendChild(desc);
   node.appendChild(textPanel);
 
@@ -2554,11 +3309,12 @@ function renderCardsForSlot(container, slot, asInteractive) {
   const fragment = document.createDocumentFragment();
   const cards = state.players[slot].cards;
   cards.forEach((card, index) => {
-    let enabled = asInteractive;
-    if (enabled) {
+    const draftSelectable = isDraftCardSelectable(slot);
+    let enabled = asInteractive || draftSelectable;
+    if (enabled && !draftSelectable) {
       const meta = getRoleMeta(card.role);
       if (!meta || meta.passive) enabled = false;
-      if (enabled && state.players[slot].gold < meta.cost) enabled = false;
+      if (enabled && state.players[slot].gold < getRoleCost(card.role, card)) enabled = false;
       if (enabled && !canUseRoleByUses(slot, card.role)) enabled = false;
     }
 
@@ -2636,6 +3392,7 @@ function updateUI() {
 
   const topSlot = opponentOf(state.localSlot);
   const bottomSlot = state.localSlot;
+  const draftMode = isDraftPhase();
 
   ui.topNameText.textContent = slotName(topSlot);
   ui.bottomNameText.textContent = slotName(bottomSlot);
@@ -2645,7 +3402,10 @@ function updateUI() {
   renderAvatar(ui.topAvatar, state.slots[topSlot].avatarId);
   renderAvatar(ui.bottomAvatar, state.slots[bottomSlot].avatarId);
 
-  ui.roundLabel.textContent = `ROUND ${Math.min(state.round, MATCH_SETTINGS.MAX_ROUNDS)}/${MATCH_SETTINGS.MAX_ROUNDS}`;
+  ui.appRoot.classList.toggle("draft-open", draftMode);
+  ui.roundLabel.textContent = draftMode
+    ? "DRAFT PHASE"
+    : `ROUND ${Math.min(state.round, MATCH_SETTINGS.MAX_ROUNDS)}/${MATCH_SETTINGS.MAX_ROUNDS}`;
   ui.timerText.textContent = state.timer.mode ? `${state.timer.remaining}s` : "--";
   ui.turnIndicator.textContent = getTurnIndicatorText();
   renderCurrentActionTypewriter(state.currentActionText);
@@ -2656,6 +3416,7 @@ function updateUI() {
 
   const canLocalAct =
     state.screen === APP_SCREENS.game &&
+    !draftMode &&
     state.phase === PHASES.choosingAction &&
     state.currentActor === state.localSlot &&
     !state.friend.pendingRequest;
@@ -2667,6 +3428,21 @@ function updateUI() {
   ui.strikeBtn.classList.toggle("is-disabled", !canUseStrike);
   ui.interestBtn.setAttribute("aria-disabled", canLocalAct ? "false" : "true");
   ui.strikeBtn.setAttribute("aria-disabled", canUseStrike ? "false" : "true");
+
+  const showDraftAccept =
+    state.screen === APP_SCREENS.game &&
+    isDraftSelectionPhase() &&
+    Boolean(state.draft) &&
+    Boolean(state.localSlot);
+  ui.draftAcceptBtn.classList.toggle("hidden", !showDraftAccept);
+  if (showDraftAccept) {
+    const accepted = Boolean(state.draft.accepted[state.localSlot]);
+    ui.draftAcceptBtn.disabled = accepted;
+    ui.draftAcceptBtn.textContent = accepted ? "WAITING..." : "ACCEPT";
+  } else {
+    ui.draftAcceptBtn.disabled = false;
+    ui.draftAcceptBtn.textContent = "ACCEPT";
+  }
 
   renderCardsForSlot(ui.topCards, topSlot, false);
   renderCardsForSlot(ui.bottomCards, bottomSlot, canLocalAct);
@@ -2856,6 +3632,17 @@ function onBottomCardsClick(event) {
   if (!(button instanceof HTMLButtonElement)) return;
   const cardIndex = Number(button.dataset.cardIndex);
   if (Number.isNaN(cardIndex)) return;
+
+  if (isDraftSelectionPhase()) {
+    if (!isDraftCardSelectable(state.localSlot)) return;
+    const current = getDraftSelectionsForSlot(state.localSlot);
+    const exists = current.includes(cardIndex);
+    const next = exists ? current.filter((idx) => idx !== cardIndex) : [...current, cardIndex];
+    setDraftSelectionsForSlot(state.localSlot, next);
+    setCurrentAction(`Draft selection: ${normalizeDraftSelectionIndices(next).length} card(s) marked for swap.`);
+    return;
+  }
+
   submitLocalAction({ kind: "card", cardIndex });
 }
 
@@ -2993,6 +3780,9 @@ function bindEvents() {
   ui.interestBtn.addEventListener("click", () => submitLocalAction("INTEREST"));
   ui.strikeBtn.addEventListener("click", () => submitLocalAction("STRIKE"));
   ui.bottomCards.addEventListener("click", onBottomCardsClick);
+  ui.draftAcceptBtn.addEventListener("click", () => {
+    void submitLocalDraftAccept(false);
+  });
 
   ui.acceptBtn.addEventListener("click", () => submitLocalResponse("ACCEPT"));
   ui.challengeBtn.addEventListener("click", () => submitLocalResponse("CHALLENGE"));
@@ -3057,6 +3847,7 @@ function cacheElements() {
   ui.timerText = document.getElementById("timerText");
   ui.turnIndicator = document.getElementById("turnIndicator");
   ui.currentActionText = document.getElementById("currentActionText");
+  ui.draftAcceptBtn = document.getElementById("draftAcceptBtn");
 
   ui.topPanel = document.getElementById("topPanel");
   ui.bottomPanel = document.getElementById("bottomPanel");
