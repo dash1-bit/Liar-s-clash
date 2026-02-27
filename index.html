@@ -221,13 +221,8 @@
       <p id="tutorialStepText" class="tutorial-step-text">Play a card. You can tell the truth... or bluff.</p>
 
       <div class="tutorial-demo tutorial-demo-cards">
-        <p class="tutorial-demo-title">Card Row</p>
-        <div class="tutorial-mini-cards">
-          <div class="role-card tutorial-mini-card"><span class="card-label">SIREN</span></div>
-          <div class="role-card tutorial-mini-card"><span class="card-label">KNIGHT</span></div>
-          <div class="role-card tutorial-mini-card"><span class="card-label">GOBLIN</span></div>
-          <div class="role-card tutorial-mini-card"><span class="card-label">ELF</span></div>
-        </div>
+        <p class="tutorial-demo-title">Your 4 cards: 2 REAL, 2 FAKE</p>
+        <div id="tutorialCardsRow" class="card-grid tutorial-card-grid" aria-label="Tutorial sample cards"></div>
       </div>
 
       <div class="tutorial-demo tutorial-decision-demo">
@@ -245,6 +240,18 @@
       </div>
 
       <button id="tutorialNextBtn" class="btn mode-btn tutorial-next-btn" type="button">Next</button>
+    </div>
+  </section>
+
+  <section id="levelUnlockModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Level unlock">
+    <div class="modal-card level-unlock-card">
+      <h2 class="section-title">Congratulations!</h2>
+      <p id="levelUnlockLevelText" class="helper-text">You reached Level 2.</p>
+      <div class="level-unlock-role">
+        <img id="levelUnlockImage" class="level-unlock-thumb" alt="Unlocked card" />
+        <p id="levelUnlockRoleText" class="helper-text">New card unlocked: JOKER</p>
+      </div>
+      <button id="levelUnlockCloseBtn" class="btn mode-btn" type="button">Nice!</button>
     </div>
   </section>
 

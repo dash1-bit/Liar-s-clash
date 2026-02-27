@@ -1005,6 +1005,13 @@ body {
   text-shadow: none;
 }
 
+.card-tutorial-fake-tag {
+  color: #f2f2f0;
+  border-color: rgba(160, 160, 160, 0.72);
+  background: rgba(104, 104, 104, 0.9);
+  text-shadow: none;
+}
+
 .current-action-panel {
   display: grid;
   place-items: center;
@@ -1417,20 +1424,14 @@ body {
   font-weight: 900;
 }
 
-.tutorial-mini-cards {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+.tutorial-card-grid {
+  margin-top: 2px;
+  gap: clamp(4px, 1.1vw, 6px);
 }
 
-.tutorial-mini-card {
-  min-height: clamp(58px, 10vh, 74px);
+.tutorial-role-card {
   cursor: default;
   pointer-events: none;
-}
-
-.tutorial-mini-card .card-label {
-  font-size: clamp(0.52rem, 1.6vw, 0.62rem);
 }
 
 .tutorial-decision-row {
@@ -1596,6 +1597,32 @@ body {
   background: #2a2825;
   padding: 12px;
   position: relative;
+}
+
+.level-unlock-card {
+  max-width: min(92vw, 340px);
+  overflow: hidden;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+  padding-top: 18px;
+}
+
+.level-unlock-role {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.level-unlock-thumb {
+  width: 52px;
+  height: 68px;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 120, 112, 0.55);
+  object-fit: cover;
+  background: #1f1e1c;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
 }
 
 .modal-close-btn {

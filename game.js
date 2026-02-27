@@ -142,6 +142,19 @@ const TUTORIAL_STEPS = Object.freeze([
   })
 ]);
 
+const TUTORIAL_SAMPLE_CARDS = Object.freeze([
+  Object.freeze({ role: "KNIGHT", isReal: true }),
+  Object.freeze({ role: "SIREN", isReal: false }),
+  Object.freeze({ role: "GOBLIN", isReal: true }),
+  Object.freeze({ role: "DWARF", isReal: false })
+]);
+
+const SESSION_LEVEL_MAX = 3;
+const ROLE_UNLOCK_LEVELS = Object.freeze({
+  JOKER: 2,
+  ANGEL: 3
+});
+
 const BOT_IDENTITIES = Object.freeze([
   Object.freeze({ name: "Hikaru", avatarId: "avatar-2" }),
   Object.freeze({ name: "Danny", avatarId: "avatar-1" }),
@@ -182,6 +195,7 @@ const state = {
   screen: APP_SCREENS.home,
   mode: null,
   profile: { name: "Matt", avatarId: "avatar-1", level: 1, ranking: 1000, opponentRanking: 1000 },
+  progression: { pendingUnlock: null },
   home: { tipIndex: 0 },
   friend: {
     roomId: "",
@@ -1301,6 +1315,19 @@ function getAllRoles() {
   return Object.keys(ROLE_CONFIG);
 }
 
+function getUnlockLevelForRole(role) {
+  return ROLE_UNLOCK_LEVELS[role] || 1;
+}
+
+function isUnlocked(role, level = state.profile.level) {
+  const required = getUnlockLevelForRole(role);
+  return Number(level) >= required;
+}
+
+function getUnlockedRoles(level = state.profile.level) {
+  return getAllRoles().filter((role) => isUnlocked(role, level));
+}
+
 function normalizeDraftSelectionIndices(indices) {
   if (!Array.isArray(indices)) return [];
   const cleaned = indices
@@ -1367,27 +1394,31 @@ function assignTruthToCards(cards, rng) {
   });
 }
 
-function buildDraftRolesForPlayer(rng) {
-  return pickUnique(getAllRoles(), 4, rng);
+function buildDraftRolesForPlayer(rng, level = state.profile.level) {
+  const unlockedRoles = getUnlockedRoles(level);
+  const pool = unlockedRoles.length >= 4 ? unlockedRoles : getAllRoles();
+  return pickUnique(pool, 4, rng);
 }
 
-function buildDeterministicDraftRoles(seedText) {
+function buildDeterministicDraftRoles(seedText, level = state.profile.level) {
   const rngHuman = createSeededRng(`${seedText}:draft:human`);
   const rngBot = createSeededRng(`${seedText}:draft:bot`);
   return {
-    human: buildDraftRolesForPlayer(rngHuman),
-    bot: buildDraftRolesForPlayer(rngBot)
+    human: buildDraftRolesForPlayer(rngHuman, level),
+    bot: buildDraftRolesForPlayer(rngBot, level)
   };
 }
 
-function buildDraftSwapResult(initialRoles, selectedIndices, seedText) {
+function buildDraftSwapResult(initialRoles, selectedIndices, seedText, level = state.profile.level) {
   const roles = Array.isArray(initialRoles) ? initialRoles.slice(0, 4) : [];
   const picks = normalizeDraftSelectionIndices(selectedIndices);
   if (picks.length === 0) return roles;
 
   picks.forEach((index, step) => {
     const current = new Set(roles);
-    const available = getAllRoles().filter((role) => !current.has(role));
+    const unlockedRoles = getUnlockedRoles(level);
+    const rolePool = unlockedRoles.length > 0 ? unlockedRoles : getAllRoles();
+    const available = rolePool.filter((role) => !current.has(role));
     if (available.length === 0) return;
     const rng = createSeededRng(`${seedText}:${step}:${index}`);
     const nextRole = available[Math.floor(rng() * available.length)];
@@ -1545,7 +1576,9 @@ function replaceJokerCard(playerKey, cardIndex) {
   if (!card) return null;
 
   const currentRoles = player.cards.map((item) => item.role);
-  const availableRoles = getAllRoles().filter((role) => role !== "JOKER" && !currentRoles.includes(role));
+  const unlockedRoles = getUnlockedRoles();
+  const rolePool = unlockedRoles.length > 0 ? unlockedRoles : getAllRoles();
+  const availableRoles = rolePool.filter((role) => role !== "JOKER" && !currentRoles.includes(role));
   if (availableRoles.length === 0) return null;
 
   const uses = player.roleUses.JOKER || 0;
@@ -1681,6 +1714,7 @@ async function backToMenu() {
   state.screen = APP_SCREENS.home;
   closeModal();
   updateUI();
+  openPendingUnlockModal();
 }
 
 function startBotMatch() {
@@ -2004,8 +2038,8 @@ function getDraftFinalizeDelay() {
 function buildDraftFinalPayload() {
   const seed = String(state.matchSeed || generateMatchSeed());
   const finalRoles = {
-    human: buildDraftSwapResult(state.draft.initialRoles.human, getDraftSelectionsForSlot("human"), `${seed}:swap:human`),
-    bot: buildDraftSwapResult(state.draft.initialRoles.bot, getDraftSelectionsForSlot("bot"), `${seed}:swap:bot`)
+    human: buildDraftSwapResult(state.draft.initialRoles.human, getDraftSelectionsForSlot("human"), `${seed}:swap:human`, state.profile.level),
+    bot: buildDraftSwapResult(state.draft.initialRoles.bot, getDraftSelectionsForSlot("bot"), `${seed}:swap:bot`, state.profile.level)
   };
   const finalLoadout = buildDeterministicFinalLoadout(seed, finalRoles);
   return {
@@ -2104,7 +2138,6 @@ function applyCanonicalDraftAccept(payload) {
 
   if (state.localSlot === actorSlot) state.phase = PHASES.awaitingDraftOpponent;
   if (allDraftAccepted()) state.phase = PHASES.draftReveal;
-  setCurrentAction(`${slotName(actorSlot)} accepted ${selected.length} swap${selected.length === 1 ? "" : "s"}.`);
   updateUI();
 
   void finalizeDraftIfReady();
@@ -2342,6 +2375,41 @@ function resolveRoundLimitWinner() {
   return "draw";
 }
 
+function getRoleUnlockedAtLevel(level) {
+  return Object.keys(ROLE_UNLOCK_LEVELS).find((role) => ROLE_UNLOCK_LEVELS[role] === level) || null;
+}
+
+function applySessionLevelProgression() {
+  const previousLevel = Number(state.profile.level) || 1;
+  const nextLevel = clamp(previousLevel + 1, 1, SESSION_LEVEL_MAX);
+  if (nextLevel === previousLevel) return null;
+
+  state.profile.level = nextLevel;
+  const unlockedRole = getRoleUnlockedAtLevel(nextLevel);
+  if (!unlockedRole || isUnlocked(unlockedRole, previousLevel)) return null;
+
+  const payload = { level: nextLevel, role: unlockedRole };
+  state.progression.pendingUnlock = payload;
+  return payload;
+}
+
+function openPendingUnlockModal() {
+  const pending = state.progression.pendingUnlock;
+  if (!pending) return;
+  if (!ui.levelUnlockModal || !ui.levelUnlockLevelText || !ui.levelUnlockRoleText || !ui.levelUnlockImage) return;
+
+  ui.levelUnlockLevelText.textContent = `You reached Level ${pending.level}.`;
+  ui.levelUnlockRoleText.textContent = `New card unlocked: ${getRoleDisplayName(pending.role)}`;
+  ui.levelUnlockImage.src = getRoleImagePath(pending.role);
+  ui.levelUnlockImage.alt = `${getRoleDisplayName(pending.role)} card`;
+  openModal(ui.levelUnlockModal);
+}
+
+function closeLevelUnlockModal() {
+  state.progression.pendingUnlock = null;
+  closeModal(ui.levelUnlockModal);
+}
+
 function concludeMatch(winnerKey, reason) {
   if (state.phase === PHASES.matchEnd) return;
   clearTimer();
@@ -2351,6 +2419,7 @@ function concludeMatch(winnerKey, reason) {
     state.profile.ranking = Math.max(0, state.profile.ranking + delta);
     state.profile.opponentRanking = Math.max(0, state.profile.opponentRanking - delta);
   }
+  applySessionLevelProgression();
   state.phase = PHASES.matchEnd;
   state.screen = APP_SCREENS.result;
   state.matchWinner = winnerKey;
@@ -2362,6 +2431,7 @@ function concludeMatch(winnerKey, reason) {
   clearPendingClaim();
   state.thinking = false;
   setCurrentAction(reason);
+  openPendingUnlockModal();
   updateUI();
 }
 
@@ -3832,6 +3902,71 @@ function bindModalDismiss(modalNode, closeButtonNode) {
   }
 }
 
+function ensureCardBadgeRow(node) {
+  if (!(node instanceof HTMLElement)) return null;
+  let badgeRow = node.querySelector(".card-badge-row");
+  let badgeLeft = badgeRow ? badgeRow.querySelector(".card-badge-group-left") : null;
+  let badgeRight = badgeRow ? badgeRow.querySelector(".card-badge-group-right") : null;
+
+  if (!badgeRow) {
+    badgeRow = document.createElement("div");
+    badgeRow.className = "card-badge-row";
+  }
+  if (!badgeLeft) {
+    badgeLeft = document.createElement("div");
+    badgeLeft.className = "card-badge-group card-badge-group-left";
+  }
+  if (!badgeRight) {
+    badgeRight = document.createElement("div");
+    badgeRight.className = "card-badge-group card-badge-group-right";
+  }
+
+  if (!badgeRow.contains(badgeLeft)) badgeRow.appendChild(badgeLeft);
+  if (!badgeRow.contains(badgeRight)) badgeRow.appendChild(badgeRight);
+
+  if (!node.contains(badgeRow)) {
+    const textPanel = node.querySelector(".card-text-panel");
+    if (textPanel) node.insertBefore(badgeRow, textPanel);
+    else node.appendChild(badgeRow);
+  }
+
+  return { badgeRow, badgeLeft, badgeRight };
+}
+
+function setTutorialCardStatusTag(node, isReal) {
+  const refs = ensureCardBadgeRow(node);
+  if (!refs) return;
+  const { badgeLeft } = refs;
+  badgeLeft.querySelectorAll(".card-status-tag").forEach((tag) => tag.remove());
+
+  const statusTag = document.createElement("span");
+  statusTag.className = `card-badge card-status-tag ${isReal ? "card-real-tag" : "card-tutorial-fake-tag"}`;
+  statusTag.textContent = isReal ? "REAL" : "FAKE";
+  badgeLeft.prepend(statusTag);
+}
+
+function renderTutorialCards() {
+  if (!ui.tutorialCardsRow) return;
+  ui.tutorialCardsRow.innerHTML = "";
+
+  const fragment = document.createDocumentFragment();
+  TUTORIAL_SAMPLE_CARDS.forEach((entry, index) => {
+    const card = createCard(entry.role, entry.isReal, index);
+    const node = createRoleCardNode({
+      ownerSlot: state.localSlot,
+      card,
+      cardIndex: index,
+      asButton: false,
+      disabled: false
+    });
+    node.classList.add("tutorial-role-card");
+    setTutorialCardStatusTag(node, entry.isReal);
+    fragment.appendChild(node);
+  });
+
+  ui.tutorialCardsRow.appendChild(fragment);
+}
+
 function renderTutorialStep() {
   if (!(ui.tutorialModal instanceof HTMLElement)) return;
   const steps = TUTORIAL_STEPS;
@@ -3847,6 +3982,7 @@ function renderTutorialStep() {
 }
 
 function openTutorial() {
+  renderTutorialCards();
   uiRuntime.tutorialStepIndex = 0;
   renderTutorialStep();
   openModal(ui.tutorialModal);
@@ -4126,6 +4262,12 @@ function bindEvents() {
   ui.premiumCloseBtn.addEventListener("click", () => closeModal(ui.premiumModal));
   ui.goPremiumBtn.addEventListener("click", () => showActionToast("Available soon"));
   ui.tutorialNextBtn.addEventListener("click", () => advanceTutorialStep());
+  ui.levelUnlockCloseBtn.addEventListener("click", () => closeLevelUnlockModal());
+  if (ui.levelUnlockModal instanceof HTMLElement) {
+    ui.levelUnlockModal.addEventListener("click", (event) => {
+      if (event.target === ui.levelUnlockModal) closeLevelUnlockModal();
+    });
+  }
 
   ui.avatarPreviewBtn.addEventListener("click", () => openModal(ui.avatarModal));
   ui.avatarGrid.addEventListener("click", onAvatarChoice);
@@ -4153,7 +4295,12 @@ function bindEvents() {
   bindModalDismiss(ui.premiumModal, ui.premiumCloseBtn);
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeModal();
+    if (event.key !== "Escape") return;
+    if (modalState.activeModal === ui.levelUnlockModal) {
+      closeLevelUnlockModal();
+      return;
+    }
+    closeModal();
   });
 
   applyCanonicalFromLocalStartIfNeeded();
@@ -4238,8 +4385,14 @@ function cacheElements() {
   ui.acceptBtn = document.getElementById("acceptBtn");
   ui.challengeBtn = document.getElementById("challengeBtn");
   ui.tutorialModal = document.getElementById("tutorialModal");
+  ui.tutorialCardsRow = document.getElementById("tutorialCardsRow");
   ui.tutorialStepText = document.getElementById("tutorialStepText");
   ui.tutorialNextBtn = document.getElementById("tutorialNextBtn");
+  ui.levelUnlockModal = document.getElementById("levelUnlockModal");
+  ui.levelUnlockLevelText = document.getElementById("levelUnlockLevelText");
+  ui.levelUnlockRoleText = document.getElementById("levelUnlockRoleText");
+  ui.levelUnlockImage = document.getElementById("levelUnlockImage");
+  ui.levelUnlockCloseBtn = document.getElementById("levelUnlockCloseBtn");
 
   ui.resultWinnerText = document.getElementById("resultWinnerText");
   ui.resultSummaryText = document.getElementById("resultSummaryText");
@@ -4357,6 +4510,7 @@ async function init() {
   applyAssetCssVariables();
   renderAvatarChoices();
   renderRulesRoleList();
+  renderTutorialCards();
   renderHomeTipDots();
   setHomeTip(state.home.tipIndex, false);
   startHomeTipsCarousel();
