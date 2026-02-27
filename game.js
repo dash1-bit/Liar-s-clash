@@ -47,7 +47,7 @@ const ROLE_CONFIG = Object.freeze({
   SCIENTIST: Object.freeze({ name: "SCIENTIST", cost: 0, description: "+1 Gold + reveal unknown card", maxUses: 2, passive: false }),
   JOKER: Object.freeze({ name: "JOKER", cost: 1, description: "1 DMG then transform", passive: false }),
   BERSERK: Object.freeze({ name: "BERSERK", cost: 0, description: "Self -1 HP enemy -2 HP", passive: false }),
-  BANKER: Object.freeze({ name: "BANKER", cost: 2, description: "+1 Gold / round", passive: false }),
+  BANKER: Object.freeze({ name: "BANKER", cost: 3, description: "+1 Gold / round", passive: false }),
   ANGEL: Object.freeze({ name: "ANGEL", cost: 1, description: "Swap HP and Gold", maxUses: 1, passive: false }),
   VALK: Object.freeze({ name: "VALK", cost: 3, description: "Enemy -1 HP self +1 HP", passive: false }),
   APPRENTICE: Object.freeze({ name: "APPRENTICE", cost: 2, description: "Scales each round", passive: false, apprentice: true })
