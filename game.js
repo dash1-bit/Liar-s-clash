@@ -79,7 +79,7 @@ const AVATAR_PRESETS = Object.freeze({
   "avatar-bot": Object.freeze({ id: "avatar-bot", label: "Bot" })
 });
 
-const ASSET_VERSION = "2";
+const ASSET_VERSION = "3";
 
 const UI_TIMINGS = Object.freeze({
   actionToastMs: 1800,
@@ -129,6 +129,7 @@ const state = {
   pendingAction: null,
   pendingResponder: null,
   pendingChallengeResult: null,
+  pendingClaim: null,
   currentActionText: "Ready.",
   events: [],
   resolutionToken: 0,
@@ -664,6 +665,43 @@ function withAssetVersion(path) {
   return `${path}${separator}v=${encodeURIComponent(ASSET_VERSION)}`;
 }
 
+function clearPendingClaim() {
+  state.pendingClaim = null;
+}
+
+function setPendingClaim(action) {
+  if (!action || action.kind !== "role") {
+    clearPendingClaim();
+    return;
+  }
+  if (state.pendingResponder !== state.localSlot) {
+    clearPendingClaim();
+    return;
+  }
+  if (action.actor === state.localSlot) {
+    clearPendingClaim();
+    return;
+  }
+  const actorSlot = action.actor;
+  const actorId = state.slots[actorSlot] ? state.slots[actorSlot].id : actorSlot;
+  state.pendingClaim = {
+    actorId,
+    roleName: action.role || "",
+    cardIndex: typeof action.cardIndex === "number" ? action.cardIndex : null,
+    timestamp: Date.now()
+  };
+}
+
+function isPendingClaimCard(ownerSlot, card, cardIndex) {
+  if (!state.pendingClaim) return false;
+  if (state.screen !== APP_SCREENS.game) return false;
+  if (state.phase !== PHASES.awaitingResponse || state.pendingResponder !== state.localSlot) return false;
+  const owner = state.slots[ownerSlot];
+  if (!owner || owner.id !== state.pendingClaim.actorId) return false;
+  if (typeof state.pendingClaim.cardIndex === "number") return state.pendingClaim.cardIndex === cardIndex;
+  return state.pendingClaim.roleName === card.role;
+}
+
 function getAvatarPath(avatarId) {
   const normalized = normalizeAvatarId(avatarId);
   const path = ASSET_MAP.avatarPaths[normalized] || ASSET_MAP.avatarPaths["avatar-1"];
@@ -811,7 +849,11 @@ function extractCardIndex(input) {
 }
 
 function getInvalidActionFeedback(input) {
-  if (state.screen !== APP_SCREENS.game || state.phase !== PHASES.choosingAction || state.currentActor !== state.localSlot) {
+  if (state.screen !== APP_SCREENS.game) return "Not your turn.";
+  if (state.phase === PHASES.awaitingResponse && state.pendingResponder === state.localSlot) {
+    return "Choose ACCEPT or YOU'RE LYING!";
+  }
+  if (state.phase !== PHASES.choosingAction || state.currentActor !== state.localSlot) {
     return "Not your turn.";
   }
   if (state.friend.pendingRequest) return "Not your turn.";
@@ -1082,6 +1124,7 @@ function resetMatchState(options = {}) {
   state.pendingAction = null;
   state.pendingResponder = null;
   state.pendingChallengeResult = null;
+  clearPendingClaim();
   state.matchWinner = null;
   state.matchEndReason = "";
   state.events = [];
@@ -1114,6 +1157,7 @@ async function backToMenu() {
   state.pendingAction = null;
   state.pendingResponder = null;
   state.pendingChallengeResult = null;
+  clearPendingClaim();
   state.friend.pendingRequest = null;
   state.friend.startInFlight = false;
 
@@ -1380,6 +1424,7 @@ function buildSyncSnapshot() {
     pendingAction: state.pendingAction,
     pendingResponder: state.pendingResponder,
     pendingChallengeResult: state.pendingChallengeResult,
+    pendingClaim: state.pendingClaim,
     currentActionText: state.currentActionText,
     slots: {
       human: { ...state.slots.human },
@@ -1412,6 +1457,7 @@ function applySyncPayload(payload) {
   state.pendingAction = snap.pendingAction || null;
   state.pendingResponder = snap.pendingResponder || null;
   state.pendingChallengeResult = snap.pendingChallengeResult || null;
+  state.pendingClaim = snap.pendingClaim || null;
   state.currentActionText = snap.currentActionText || "Synced.";
 
   state.slots.human = {
@@ -1490,6 +1536,7 @@ function concludeMatch(winnerKey, reason) {
   state.pendingAction = null;
   state.pendingResponder = null;
   state.pendingChallengeResult = null;
+  clearPendingClaim();
   state.thinking = false;
   setCurrentAction(reason);
   updateUI();
@@ -1521,6 +1568,7 @@ function consumeRoundAction() {
   state.pendingAction = null;
   state.pendingResponder = null;
   state.pendingChallengeResult = null;
+  clearPendingClaim();
   state.thinking = false;
   state.friend.pendingRequest = null;
 }
@@ -1560,6 +1608,7 @@ function beginTurn() {
   state.pendingAction = null;
   state.pendingResponder = null;
   state.pendingChallengeResult = null;
+  clearPendingClaim();
   state.thinking = false;
 
   const actorState = state.players[actor];
@@ -1763,6 +1812,7 @@ function promptResponseForOpponent() {
 
   const responder = opponentOf(action.actor);
   state.pendingResponder = responder;
+  setPendingClaim(action);
 
   if (state.mode === "bot") {
     if (responder === "human") {
@@ -1807,6 +1857,7 @@ function handleResponseTimeout(responder) {
   }
 
   setCurrentAction("Response timer expired. Auto ACCEPT.");
+  clearPendingClaim();
   resolveAccept();
 }
 
@@ -1829,12 +1880,13 @@ function adjustSuspicion(role, delta) {
 function resolveAccept() {
   if (state.phase !== PHASES.awaitingResponse) return;
   clearTimer();
+  clearPendingClaim();
 
   const action = state.pendingAction;
   if (!action) return;
 
   if (typeof action.cardIndex === "number") markRoleReveal(action.actor, action.cardIndex, false);
-  setCurrentAction(`ACCEPTED. ${slotLabel(action.actor)} ${action.role} resolves.`);
+  setCurrentAction(`ACCEPTED. ${slotName(action.actor)} resolves ${action.role}.`);
 
   runResolutionAfterDelay(() => {
     const pending = state.pendingAction;
@@ -1848,6 +1900,7 @@ function resolveAccept() {
 function resolveChallenge() {
   if (state.phase !== PHASES.awaitingResponse) return;
   clearTimer();
+  clearPendingClaim();
 
   const action = state.pendingAction;
   if (!action || action.kind !== "role" || typeof action.cardIndex !== "number") return;
@@ -1861,9 +1914,13 @@ function resolveChallenge() {
   state.pendingChallengeResult = { actor, challenger, role: action.role, isReal };
 
   if (isReal) {
-    setCurrentAction("CHALLENGE! Result: FAILURE (challenger loses 1 HP)");
+    setCurrentAction(
+      `${slotName(challenger)} called YOU'RE LYING!, but ${slotName(actor)} is verified REAL. ${slotName(challenger)} loses 1 HP.`
+    );
   } else {
-    setCurrentAction("CHALLENGE! Result: SUCCESS (liar loses 2 HP)");
+    setCurrentAction(
+      `${slotName(challenger)} called YOU'RE LYING!, and ${slotName(actor)} is verified FAKE. ${slotName(actor)} loses 2 HP.`
+    );
   }
 
   runResolutionAfterDelay(() => {
@@ -2228,6 +2285,7 @@ function applyCanonicalTimeout(payload) {
   if (payload.phase === "response") {
     if (state.phase !== PHASES.awaitingResponse || payload.actorSlot !== state.pendingResponder) return;
     setCurrentAction("Response timer expired. Auto ACCEPT.");
+    clearPendingClaim();
     if (payload.forcedChoice === "CHALLENGE") resolveChallenge();
     else resolveAccept();
   }
@@ -2281,6 +2339,7 @@ function submitLocalAction(input) {
 function submitLocalResponse(choice) {
   if (state.phase !== PHASES.awaitingResponse || state.pendingResponder !== state.localSlot) return;
   if (state.friend.pendingRequest) return;
+  clearPendingClaim();
 
   if (state.mode === "friend") {
     const actorSlot = state.pendingResponder;
@@ -2387,6 +2446,14 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     node.classList.add("opponent-card");
     if (card.confirmed) node.classList.add("opponent-confirmed");
     else if (card.revealedUsed) node.classList.add("opponent-played");
+  }
+
+  const pendingClaimCard = isPendingClaimCard(ownerSlot, card, cardIndex);
+  if (pendingClaimCard) {
+    node.classList.add("card--pending-claim");
+    if (state.pendingClaim && Date.now() - state.pendingClaim.timestamp <= 320) {
+      node.classList.add("card--pending-claim-flash");
+    }
   }
 
   const artLayer = document.createElement("span");
@@ -2611,6 +2678,7 @@ function updateUI() {
     !state.friend.pendingRequest;
 
   ui.responseOverlay.classList.toggle("hidden", !showResponse);
+  ui.responseOverlay.classList.toggle("decision-attention", showResponse);
   ui.appRoot.classList.toggle("response-open", showResponse);
 
   ui.resultWinnerText.textContent = getResultWinnerText();

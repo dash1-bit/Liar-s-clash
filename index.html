@@ -164,7 +164,7 @@
 
   <section id="responseOverlay" class="response-overlay hidden" role="dialog" aria-modal="true" aria-label="Respond to claim">
     <button id="acceptBtn" class="response-btn" type="button">ACCEPT</button>
-    <button id="challengeBtn" class="response-btn" type="button">CHALLENGE</button>
+    <button id="challengeBtn" class="response-btn" type="button">YOU'RE LYING!</button>
   </section>
   <p id="copyToast" class="copy-toast hidden" role="status" aria-live="polite">Copied!</p>
   <p id="actionToast" class="action-toast hidden" role="status" aria-live="polite"></p>
@@ -207,10 +207,10 @@ At turn start, the acting player is:
 
 Bluff system:
 You may play any of your 4 role cards (even fake).
-Opponent must ACCEPT or CHALLENGE.
+Opponent must ACCEPT or YOU'RE LYING!.
 
-Challenge resolution:
-If role was REAL -> challenger loses 1 HP, effect applies.
+You're lying! resolution:
+If role was REAL -> caller loses 1 HP, effect applies.
 If role was FAKE -> actor loses 2 HP, effect canceled.
 If you hold ELF and defend successfully -> gain +1 Gold.
 
