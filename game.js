@@ -3679,7 +3679,7 @@ function updateUI() {
     node.classList.toggle("active", state.screen === key);
   });
 
-  ui.playerNameInput.value = safePlayerName(state.profile.name);
+  ui.playerNameInput.value = String(state.profile.name || "");
   ui.avatarPreviewLabel.textContent = getAvatarMeta(state.profile.avatarId).label;
   renderAvatar(ui.avatarPreviewArt, state.profile.avatarId);
   if (ui.homeLevelValue) ui.homeLevelValue.textContent = String(state.profile.level);
@@ -4279,7 +4279,7 @@ function bindEvents() {
   ui.avatarGrid.addEventListener("click", onAvatarChoice);
 
   ui.playerNameInput.addEventListener("input", () => {
-    state.profile.name = safePlayerName(ui.playerNameInput.value);
+    state.profile.name = String(ui.playerNameInput.value || "");
     if (state.mode !== "friend") {
       state.slots.human.name = state.profile.name;
     }
