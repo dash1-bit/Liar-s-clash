@@ -79,6 +79,8 @@ const AVATAR_PRESETS = Object.freeze({
   "avatar-bot": Object.freeze({ id: "avatar-bot", label: "Bot" })
 });
 
+const ASSET_VERSION = "2";
+
 const UI_TIMINGS = Object.freeze({
   actionToastMs: 1800,
   currentActionTypeMs: 25
@@ -656,13 +658,20 @@ function getAvatarMeta(avatarId) {
   return AVATAR_PRESETS[normalizeAvatarId(avatarId)] || AVATAR_PRESETS["avatar-1"];
 }
 
+function withAssetVersion(path) {
+  if (!path) return "";
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}v=${encodeURIComponent(ASSET_VERSION)}`;
+}
+
 function getAvatarPath(avatarId) {
   const normalized = normalizeAvatarId(avatarId);
-  return ASSET_MAP.avatarPaths[normalized] || ASSET_MAP.avatarPaths["avatar-1"];
+  const path = ASSET_MAP.avatarPaths[normalized] || ASSET_MAP.avatarPaths["avatar-1"];
+  return withAssetVersion(path);
 }
 
 function getRoleImagePath(role) {
-  return ASSET_MAP.roleImagePaths[role] || "";
+  return withAssetVersion(ASSET_MAP.roleImagePaths[role] || "");
 }
 
 function createInlineIcon(iconKey, className = "inline-icon") {
@@ -670,7 +679,7 @@ function createInlineIcon(iconKey, className = "inline-icon") {
   if (!iconPath) return null;
   const img = document.createElement("img");
   img.className = className;
-  img.src = iconPath;
+  img.src = withAssetVersion(iconPath);
   img.alt = "";
   img.setAttribute("aria-hidden", "true");
   return img;
@@ -756,7 +765,7 @@ function renderAvatarChoices() {
 
 function applyAssetCssVariables() {
   if (!document || !document.documentElement) return;
-  document.documentElement.style.setProperty("--badge-image", `url("${ASSET_MAP.badgePath}")`);
+  document.documentElement.style.setProperty("--badge-image", `url("${withAssetVersion(ASSET_MAP.badgePath)}")`);
 }
 
 function createStatSegment(iconKey, text) {
