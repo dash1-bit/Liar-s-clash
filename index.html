@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Liar's Clash</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -129,11 +132,11 @@
         <section class="basic-actions" aria-label="Basic actions">
           <button id="interestBtn" class="btn action-btn" type="button">
             INTEREST
-            <span class="action-desc">+1 Gold</span>
+            <span id="interestActionDesc" class="action-desc">+1 Gold</span>
           </button>
           <button id="strikeBtn" class="btn action-btn" type="button">
             STRIKE
-            <span class="action-desc">Deal 1 DMG</span>
+            <span id="strikeActionDesc" class="action-desc">Deal 1 DMG</span>
             <span class="cost-pill">2</span>
           </button>
         </section>
@@ -171,15 +174,15 @@
       <div class="avatar-grid">
         <button class="avatar-choice" type="button" data-avatar-id="avatar-1">
           <span class="avatar-art avatar-1"></span>
-          <span>Avatar 1</span>
+          <span class="avatar-choice-label">Adventurer</span>
         </button>
         <button class="avatar-choice" type="button" data-avatar-id="avatar-2">
           <span class="avatar-art avatar-2"></span>
-          <span>Avatar 2</span>
+          <span class="avatar-choice-label">Noble</span>
         </button>
         <button class="avatar-choice" type="button" data-avatar-id="avatar-3">
           <span class="avatar-art avatar-3"></span>
-          <span>Avatar 3</span>
+          <span class="avatar-choice-label">Rogue</span>
         </button>
       </div>
     </div>

@@ -47,11 +47,36 @@ const BASIC_ACTIONS = Object.freeze({
   STRIKE: Object.freeze({ id: "STRIKE", cost: 2, description: "Deal 1 DMG", challengeable: false })
 });
 
+const ASSET_MAP = Object.freeze({
+  avatarPaths: Object.freeze({
+    "avatar-1": "./Recursos/Adventurer_avatar.png",
+    "avatar-2": "./Recursos/Noble_avatar.png",
+    "avatar-3": "./Recursos/rogue_avatar.png",
+    "avatar-bot": "./Recursos/Noble_avatar.png"
+  }),
+  roleImagePaths: Object.freeze({
+    SIREN: "./Recursos/Siren.png",
+    DWARF: "./Recursos/Dwarf.png",
+    KNIGHT: "./Recursos/Knight.png",
+    GOBLIN: "./Recursos/Goblin.png",
+    ELF: "./Recursos/Elf.png",
+    ENT: "./Recursos/Ent.png",
+    PIRATE: "./Recursos/Pirate.png"
+  }),
+  iconPaths: Object.freeze({
+    hp: "./Recursos/HP.png",
+    gold: "./Recursos/Gold.png",
+    shield: "./Recursos/Shield.png",
+    sword: "./Recursos/Sword.png"
+  }),
+  badgePath: "./Recursos/Badge.png"
+});
+
 const AVATAR_PRESETS = Object.freeze({
-  "avatar-1": Object.freeze({ id: "avatar-1", label: "Avatar 1", className: "avatar-1" }),
-  "avatar-2": Object.freeze({ id: "avatar-2", label: "Avatar 2", className: "avatar-2" }),
-  "avatar-3": Object.freeze({ id: "avatar-3", label: "Avatar 3", className: "avatar-3" }),
-  "avatar-bot": Object.freeze({ id: "avatar-bot", label: "Bot", className: "avatar-bot" })
+  "avatar-1": Object.freeze({ id: "avatar-1", label: "Adventurer" }),
+  "avatar-2": Object.freeze({ id: "avatar-2", label: "Noble" }),
+  "avatar-3": Object.freeze({ id: "avatar-3", label: "Rogue" }),
+  "avatar-bot": Object.freeze({ id: "avatar-bot", label: "Bot" })
 });
 
 const ui = {};
@@ -618,6 +643,141 @@ function normalizeAvatarId(value) {
 
 function getAvatarMeta(avatarId) {
   return AVATAR_PRESETS[normalizeAvatarId(avatarId)] || AVATAR_PRESETS["avatar-1"];
+}
+
+function getAvatarPath(avatarId) {
+  const normalized = normalizeAvatarId(avatarId);
+  return ASSET_MAP.avatarPaths[normalized] || ASSET_MAP.avatarPaths["avatar-1"];
+}
+
+function getRoleImagePath(role) {
+  return ASSET_MAP.roleImagePaths[role] || "";
+}
+
+function createInlineIcon(iconKey, className = "inline-icon") {
+  const iconPath = ASSET_MAP.iconPaths[iconKey];
+  if (!iconPath) return null;
+  const img = document.createElement("img");
+  img.className = className;
+  img.src = iconPath;
+  img.alt = "";
+  img.setAttribute("aria-hidden", "true");
+  return img;
+}
+
+function appendText(node, text) {
+  node.appendChild(document.createTextNode(String(text || "")));
+}
+
+function renderRoleDescription(node, role) {
+  if (!node) return;
+  node.textContent = "";
+
+  const icon = (key) => {
+    const image = createInlineIcon(key);
+    if (image) node.appendChild(image);
+  };
+
+  switch (role) {
+    case "DWARF":
+      icon("shield");
+      appendText(node, " Shield next ");
+      icon("sword");
+      appendText(node, " DMG");
+      break;
+    case "KNIGHT":
+      appendText(node, "2 ");
+      icon("sword");
+      appendText(node, " DMG");
+      break;
+    case "GOBLIN":
+      appendText(node, "Steal 1 ");
+      icon("gold");
+      break;
+    case "ENT":
+      appendText(node, "+2 ");
+      icon("hp");
+      break;
+    case "ELF":
+      appendText(node, "Passive: +1 ");
+      icon("gold");
+      appendText(node, " on defend");
+      break;
+    case "PIRATE":
+      appendText(node, "1 ");
+      icon("sword");
+      appendText(node, " +1 ");
+      icon("gold");
+      break;
+    default:
+      appendText(node, "Skip next turn");
+      break;
+  }
+}
+
+function setActionDescriptions() {
+  if (ui.interestActionDesc) {
+    ui.interestActionDesc.textContent = "";
+    appendText(ui.interestActionDesc, "+1 ");
+    const goldIcon = createInlineIcon("gold");
+    if (goldIcon) ui.interestActionDesc.appendChild(goldIcon);
+  }
+  if (ui.strikeActionDesc) {
+    ui.strikeActionDesc.textContent = "";
+    appendText(ui.strikeActionDesc, "Deal 1 ");
+    const swordIcon = createInlineIcon("sword");
+    if (swordIcon) ui.strikeActionDesc.appendChild(swordIcon);
+    appendText(ui.strikeActionDesc, " DMG");
+  }
+}
+
+function renderAvatarChoices() {
+  if (!ui.avatarGrid) return;
+  const choices = ui.avatarGrid.querySelectorAll(".avatar-choice");
+  choices.forEach((choice) => {
+    const avatarId = normalizeAvatarId(choice.dataset.avatarId || "avatar-1");
+    const artNode = choice.querySelector(".avatar-art");
+    const labelNode = choice.querySelector(".avatar-choice-label");
+    renderAvatar(artNode, avatarId);
+    if (labelNode) labelNode.textContent = getAvatarMeta(avatarId).label;
+  });
+}
+
+function applyAssetCssVariables() {
+  if (!document || !document.documentElement) return;
+  document.documentElement.style.setProperty("--badge-image", `url("${ASSET_MAP.badgePath}")`);
+}
+
+function createStatSegment(iconKey, text) {
+  const segment = document.createElement("span");
+  segment.className = "stat-segment";
+  const icon = createInlineIcon(iconKey, "stat-icon");
+  if (icon) segment.appendChild(icon);
+  const value = document.createElement("span");
+  value.className = "stat-value";
+  value.textContent = text;
+  segment.appendChild(value);
+  return segment;
+}
+
+function createStatSeparator() {
+  const separator = document.createElement("span");
+  separator.className = "stat-separator";
+  separator.textContent = "|";
+  return separator;
+}
+
+function renderStatsForSlot(node, slot) {
+  if (!node) return;
+  const p = state.players[slot];
+  node.textContent = "";
+  node.appendChild(createStatSegment("hp", String(p.hp)));
+  node.appendChild(createStatSeparator());
+  node.appendChild(createStatSegment("gold", String(p.gold)));
+  if (p.shield) {
+    node.appendChild(createStatSeparator());
+    node.appendChild(createStatSegment("shield", "Shield"));
+  }
 }
 
 function opponentOf(slot) {
@@ -2140,8 +2300,8 @@ function getConnectionBannerText() {
 
 function renderAvatar(node, avatarId) {
   if (!node) return;
-  node.classList.remove("avatar-1", "avatar-2", "avatar-3", "avatar-bot");
-  node.classList.add(getAvatarMeta(avatarId).className);
+  const path = getAvatarPath(avatarId);
+  node.style.backgroundImage = `url("${path}")`;
 }
 
 function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) {
@@ -2159,6 +2319,16 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     if (card.confirmed) node.classList.add("opponent-confirmed");
     else if (card.revealedUsed) node.classList.add("opponent-played");
   }
+
+  const artLayer = document.createElement("span");
+  artLayer.className = "card-art";
+  const roleImagePath = getRoleImagePath(card.role);
+  if (roleImagePath) artLayer.style.backgroundImage = `url("${roleImagePath}")`;
+  node.appendChild(artLayer);
+
+  const textFade = document.createElement("span");
+  textFade.className = "card-text-fade";
+  node.appendChild(textFade);
 
   const meta = getRoleMeta(card.role);
 
@@ -2191,7 +2361,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
 
   const desc = document.createElement("p");
   desc.className = "card-desc";
-  desc.textContent = meta ? meta.description : "";
+  renderRoleDescription(desc, card.role);
   node.appendChild(desc);
 
   if (asButton && disabled) {
@@ -2229,12 +2399,6 @@ function renderCardsForSlot(container, slot, asInteractive) {
   });
 
   container.appendChild(fragment);
-}
-
-function statsTextForSlot(slot) {
-  const p = state.players[slot];
-  const shield = p.shield ? " | Shield" : "";
-  return `HP: ${p.hp} | Gold: ${p.gold}${shield}`;
 }
 
 function updateUI() {
@@ -2300,8 +2464,8 @@ function updateUI() {
 
   ui.topNameText.textContent = slotName(topSlot);
   ui.bottomNameText.textContent = slotName(bottomSlot);
-  ui.topStatsText.textContent = statsTextForSlot(topSlot);
-  ui.bottomStatsText.textContent = statsTextForSlot(bottomSlot);
+  renderStatsForSlot(ui.topStatsText, topSlot);
+  renderStatsForSlot(ui.bottomStatsText, bottomSlot);
 
   renderAvatar(ui.topAvatar, state.slots[topSlot].avatarId);
   renderAvatar(ui.bottomAvatar, state.slots[bottomSlot].avatarId);
@@ -2660,6 +2824,8 @@ function cacheElements() {
 
   ui.interestBtn = document.getElementById("interestBtn");
   ui.strikeBtn = document.getElementById("strikeBtn");
+  ui.interestActionDesc = document.getElementById("interestActionDesc");
+  ui.strikeActionDesc = document.getElementById("strikeActionDesc");
 
   ui.responseOverlay = document.getElementById("responseOverlay");
   ui.acceptBtn = document.getElementById("acceptBtn");
@@ -2759,6 +2925,9 @@ function exposeSupabaseTest() {
 
 async function init() {
   cacheElements();
+  applyAssetCssVariables();
+  renderAvatarChoices();
+  setActionDescriptions();
   exposeSupabaseTest();
   bindEvents();
 
