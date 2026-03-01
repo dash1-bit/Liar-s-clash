@@ -157,7 +157,7 @@ const GAME_EVENTS = Object.freeze(Object.values(GAME_EVENT_REGISTRY));
 
 const HERO_ORDER = Object.freeze(["adventurer", "noble", "rogue", "guardian", "oracle"]);
 const COLLECTION_TABS = Object.freeze(["cards", "heroes", "events"]);
-const PROGRESSION_STORAGE_KEY = "liarsClashProgressionV2";
+const PROGRESSION_STORAGE_KEY = "liarsClashProgressionV3";
 
 const LEAGUE_SEGMENTS = Object.freeze([
   Object.freeze({ id: "wood_iii", league: "Wood", subleague: "III", basePoints: 0 }),
@@ -166,7 +166,9 @@ const LEAGUE_SEGMENTS = Object.freeze([
   Object.freeze({ id: "stone_iii", league: "Stone", subleague: "III", basePoints: 300 }),
   Object.freeze({ id: "stone_ii", league: "Stone", subleague: "II", basePoints: 400 }),
   Object.freeze({ id: "stone_i", league: "Stone", subleague: "I", basePoints: 500 }),
-  Object.freeze({ id: "bronze_iii", league: "Bronze", subleague: "III", basePoints: 600 })
+  Object.freeze({ id: "bronze_iii", league: "Bronze", subleague: "III", basePoints: 600 }),
+  Object.freeze({ id: "bronze_ii", league: "Bronze", subleague: "II", basePoints: 700 }),
+  Object.freeze({ id: "bronze_i", league: "Bronze", subleague: "I", basePoints: 800 })
 ]);
 
 const LEAGUE_SEGMENT_BY_ID = Object.freeze(
@@ -192,40 +194,41 @@ const PROGRESSION_REWARDS = Object.freeze([
   Object.freeze({ id: "wood_ii_20_scientist", segmentId: "wood_ii", point: 20, rewardType: "card", itemId: "SCIENTIST", label: "Unlock Card: Scientist" }),
   Object.freeze({ id: "wood_ii_40_banker", segmentId: "wood_ii", point: 40, rewardType: "card", itemId: "BANKER", label: "Unlock Card: Banker" }),
   Object.freeze({ id: "wood_ii_60_rogue", segmentId: "wood_ii", point: 60, rewardType: "hero", itemId: "rogue", label: "Unlock Hero: Rogue" }),
-  Object.freeze({ id: "wood_ii_80_adept", segmentId: "wood_ii", point: 80, rewardType: "card", itemId: "APPRENTICE", label: "Unlock Card: Adept" }),
-  Object.freeze({ id: "wood_ii_100_angel", segmentId: "wood_ii", point: 100, rewardType: "card", itemId: "ANGEL", label: "Unlock Card: Angel" }),
+  Object.freeze({ id: "wood_ii_80_pirate", segmentId: "wood_ii", point: 80, rewardType: "card", itemId: "PIRATE", label: "Unlock Card: Pirate" }),
+  Object.freeze({ id: "wood_ii_100_adept", segmentId: "wood_ii", point: 100, rewardType: "card", itemId: "APPRENTICE", label: "Unlock Card: Adept" }),
 
-  Object.freeze({ id: "wood_i_20_joker", segmentId: "wood_i", point: 20, rewardType: "card", itemId: "JOKER", label: "Unlock Card: Joker" }),
-  Object.freeze({ id: "wood_i_40_guardian", segmentId: "wood_i", point: 40, rewardType: "hero", itemId: "guardian", label: "Unlock Hero: Guardian" }),
+  Object.freeze({ id: "wood_i_20_angel", segmentId: "wood_i", point: 20, rewardType: "card", itemId: "ANGEL", label: "Unlock Card: Angel" }),
+  Object.freeze({ id: "wood_i_40_joker", segmentId: "wood_i", point: 40, rewardType: "card", itemId: "JOKER", label: "Unlock Card: Joker" }),
+  Object.freeze({ id: "wood_i_60_guardian", segmentId: "wood_i", point: 60, rewardType: "hero", itemId: "guardian", label: "Unlock Hero: Guardian" }),
   Object.freeze({
-    id: "wood_i_60_skin_adventurer",
+    id: "wood_i_80_skin_adventurer",
     segmentId: "wood_i",
-    point: 60,
+    point: 80,
     rewardType: "skin",
     itemId: "adventurer",
     label: "Unlock Hero Skin: Adventurer"
   }),
   Object.freeze({
-    id: "wood_i_80_skin_noble",
+    id: "wood_i_100_skin_noble",
     segmentId: "wood_i",
-    point: 80,
+    point: 100,
     rewardType: "skin",
     itemId: "noble",
     label: "Unlock Hero Skin: Noble"
   }),
   Object.freeze({
-    id: "wood_i_100_event_extra_hp",
-    segmentId: "wood_i",
-    point: 100,
+    id: "stone_iii_40_event_extra_hp",
+    segmentId: "stone_iii",
+    point: 40,
     rewardType: "event",
     itemId: "extra_hp",
     label: "Unlock Game Event: +1 Starting HP"
   }),
 
   Object.freeze({
-    id: "stone_iii_40_skin_rogue",
+    id: "stone_iii_80_skin_rogue",
     segmentId: "stone_iii",
-    point: 40,
+    point: 80,
     rewardType: "skin",
     itemId: "rogue",
     label: "Unlock Hero Skin: Rogue"
@@ -301,6 +304,17 @@ const ROLE_COLLECTION_META = Object.freeze({
 });
 
 const MAX_PROGRESS_POINTS = LEAGUE_SEGMENTS[LEAGUE_SEGMENTS.length - 1].basePoints + 100;
+const PROGRESSION_XP_RULES = Object.freeze({
+  baseByLeague: Object.freeze({
+    Wood: 10,
+    Stone: 8,
+    Bronze: 6
+  }),
+  winBonus: 5,
+  firstWinOfDayBonus: 10,
+  claimCardBonus: 10,
+  claimHeroBonus: 20
+});
 
 const ASSET_VERSION = "3";
 
@@ -322,6 +336,21 @@ const HOME_TIPS = Object.freeze([
   "Pressure low HP opponents\u2014force tough decisions.",
   "Sometimes ACCEPT is the best punish.",
   "Win the mind game, not just the numbers."
+]);
+
+const MATCH_ONBOARDING_STEPS = Object.freeze([
+  Object.freeze({
+    title: "Your REAL cards",
+    body: "These are your REAL cards for this match. Play them freely - they are always safe.",
+    button: "OK",
+    filterReal: true
+  }),
+  Object.freeze({
+    title: "Your BLUFF cards",
+    body: "These are your BLUFF cards. If you play one and your opponent catches the lie, you lose 2 HP.",
+    button: "OK, start",
+    filterReal: false
+  })
 ]);
 
 const TUTORIAL_STEPS = Object.freeze([
@@ -386,6 +415,8 @@ const uiRuntime = {
   lastActionText: "",
   claimPulseRewardId: null,
   claimPulseTimerId: null,
+  onboardingTypeTimerId: null,
+  onboardingTypeToken: 0,
   tutorialStepIndex: 0,
   homeTipTimerId: null,
   homeTipFadeTimerId: null
@@ -434,6 +465,7 @@ const state = {
   draft: createDraftState(),
   rogueSwap: createRogueSwapState(),
   heroRuntime: createHeroRuntimeState(),
+  matchOnboarding: createMatchOnboardingState(),
   heroTooltip: { slot: null, open: false },
   gameEventId: "none",
   gameEventTooltip: { open: false },
@@ -818,6 +850,27 @@ const net = {
       }
     }
 
+    if (payload.kind === "ONBOARDING_READY") {
+      if (state.screen !== APP_SCREENS.game) return;
+      if (state.phase !== PHASES.gameStart) return;
+      if (payload.actorSlot !== "human" && payload.actorSlot !== "bot") return;
+      if (!state.slots[payload.actorSlot] || state.slots[payload.actorSlot].id !== msg.senderId) return;
+
+      await this.sendEvent(
+        "ACTION",
+        {
+          kind: "ONBOARDING_READY",
+          actorSlot: payload.actorSlot
+        },
+        {
+          canonical: true,
+          actorId: state.slots[payload.actorSlot].id,
+          applyLocal: true
+        }
+      );
+      return;
+    }
+
     if (payload.kind === "DRAFT_ACCEPT") {
       if (state.screen !== APP_SCREENS.game) return;
       if (!isDraftPhase()) return;
@@ -980,13 +1033,22 @@ function createHeroRuntimeState() {
   };
 }
 
+function createMatchOnboardingState() {
+  return {
+    open: false,
+    stepIndex: 0,
+    readyBySlot: { human: false, bot: false }
+  };
+}
+
 function createDefaultProgressionState() {
   return {
     points: 0,
     matchesCompleted: 0,
     claimedRewardIds: Object.create(null),
     unlockedCosmetics: Object.create(null),
-    rankedModeUnlocked: false
+    rankedModeUnlocked: false,
+    firstWinBonusDate: ""
   };
 }
 
@@ -998,7 +1060,8 @@ function normalizeProgressionState(raw) {
     matchesCompleted: Math.max(0, Number(raw.matchesCompleted) || 0),
     claimedRewardIds: Object.create(null),
     unlockedCosmetics: Object.create(null),
-    rankedModeUnlocked: Boolean(raw.rankedModeUnlocked)
+    rankedModeUnlocked: Boolean(raw.rankedModeUnlocked),
+    firstWinBonusDate: typeof raw.firstWinBonusDate === "string" ? raw.firstWinBonusDate.slice(0, 10) : ""
   };
 
   if (raw.claimedRewardIds && typeof raw.claimedRewardIds === "object") {
@@ -1047,7 +1110,8 @@ function persistProgressionState() {
         matchesCompleted: Math.max(0, Number(state.progression.matchesCompleted) || 0),
         claimedRewardIds: { ...state.progression.claimedRewardIds },
         unlockedCosmetics: { ...state.progression.unlockedCosmetics },
-        rankedModeUnlocked: Boolean(state.progression.rankedModeUnlocked)
+        rankedModeUnlocked: Boolean(state.progression.rankedModeUnlocked),
+        firstWinBonusDate: String(state.progression.firstWinBonusDate || "").slice(0, 10)
       })
     );
   } catch (_error) {
@@ -1073,6 +1137,40 @@ function getLeagueSegmentByPoints(points = state.progression.points) {
 function formatLeagueBadgeText(points = state.progression.points) {
   const segment = getLeagueSegmentByPoints(points);
   return `${segment.league.toUpperCase()} ${segment.subleague}`;
+}
+
+function formatLeagueProgressText(points = state.progression.points) {
+  const segment = getLeagueSegmentByPoints(points);
+  return `${segment.league.toUpperCase()} ${segment.subleague} - Points: ${segment.pointsInSegment}/100`;
+}
+
+function getLocalDateStamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getBaseMatchXpByLeague(points = state.progression.points) {
+  const segment = getLeagueSegmentByPoints(points);
+  return PROGRESSION_XP_RULES.baseByLeague[segment.league] || 0;
+}
+
+function addProgressPoints(amount) {
+  const value = Math.max(0, Math.floor(Number(amount) || 0));
+  if (value <= 0) return 0;
+  const before = clamp(Number(state.progression.points) || 0, 0, MAX_PROGRESS_POINTS);
+  const after = clamp(before + value, 0, MAX_PROGRESS_POINTS);
+  state.progression.points = after;
+  return Math.max(0, after - before);
+}
+
+function getRewardClaimXpBonus(reward) {
+  if (!reward) return 0;
+  if (reward.rewardType === "card") return PROGRESSION_XP_RULES.claimCardBonus;
+  if (reward.rewardType === "hero") return PROGRESSION_XP_RULES.claimHeroBonus;
+  return 0;
 }
 
 function getRewardAbsolutePoints(reward) {
@@ -1202,6 +1300,9 @@ function claimReward(rewardId, options = {}) {
   state.progression.claimedRewardIds[reward.id] = true;
   if (reward.rewardType === "skin") state.progression.unlockedCosmetics[reward.itemId] = true;
   if (reward.rewardType === "mode" && reward.itemId === "ranked") state.progression.rankedModeUnlocked = true;
+  if (!options.skipXpBonus) {
+    addProgressPoints(getRewardClaimXpBonus(reward));
+  }
   ensureSelectedHeroUnlocked();
   if (!options.skipPulse) setClaimPulse(reward.id);
   if (!options.skipPersist) persistProgressionState();
@@ -1222,16 +1323,42 @@ function claimAllRewards() {
   return claimed;
 }
 
-function applyDemoProgressAfterCompletedMatch() {
+function hasClaimableHeroRewards() {
+  return PROGRESSION_REWARDS.some((reward) => reward.rewardType === "hero" && isRewardClaimable(reward));
+}
+
+function applyDemoCheatUnlock() {
+  if ((Number(state.progression.matchesCompleted) || 0) < 1) return false;
+  state.progression.points = MAX_PROGRESS_POINTS;
+  PROGRESSION_REWARDS.forEach((reward) => {
+    state.progression.claimedRewardIds[reward.id] = true;
+    if (reward.rewardType === "skin") state.progression.unlockedCosmetics[reward.itemId] = true;
+    if (reward.rewardType === "mode" && reward.itemId === "ranked") state.progression.rankedModeUnlocked = true;
+  });
+  ensureSelectedHeroUnlocked();
+  persistProgressionState();
+  renderAvatarChoices();
+  return true;
+}
+
+function applyProgressAfterCompletedMatch(winnerKey) {
   const matches = Math.max(0, Number(state.progression.matchesCompleted) || 0);
   state.progression.matchesCompleted = matches + 1;
-  if (matches === 0) {
-    state.progression.points = MAX_PROGRESS_POINTS;
-    persistProgressionState();
-    showActionToast("League rewards are now claimable.");
-    return;
+
+  let gained = getBaseMatchXpByLeague();
+  const localWon = (winnerKey === "human" || winnerKey === "bot") && winnerKey === state.localSlot;
+  if (localWon) {
+    gained += PROGRESSION_XP_RULES.winBonus;
+    const today = getLocalDateStamp();
+    if (state.progression.firstWinBonusDate !== today) {
+      state.progression.firstWinBonusDate = today;
+      gained += PROGRESSION_XP_RULES.firstWinOfDayBonus;
+    }
   }
+
+  const applied = addProgressPoints(gained);
   persistProgressionState();
+  if (applied > 0) showActionToast(`+${applied} Points earned.`);
 }
 
 function getRoleCollectionMeta(role) {
@@ -2247,6 +2374,7 @@ function resetMatchState(options = {}) {
   state.draft = createDraftState();
   state.rogueSwap = createRogueSwapState();
   state.heroRuntime = createHeroRuntimeState();
+  state.matchOnboarding = createMatchOnboardingState();
   state.heroTooltip = { slot: null, open: false };
   state.gameEventTooltip = { open: false };
   state.round = 1;
@@ -2285,6 +2413,7 @@ async function backToMenu() {
   clearTimer();
   cancelResolutionQueue();
   stopCurrentActionTypewriter();
+  stopOnboardingTypewriter();
   uiRuntime.lastActionText = "";
   clearActionToast();
   closeHeroTooltip();
@@ -2762,7 +2891,7 @@ function applyDraftFinalStart(payload) {
   state.screen = APP_SCREENS.game;
   setCurrentAction("Match start.");
   updateUI();
-  setTimeout(() => beginTurn(), 220);
+  openMatchOnboarding();
 }
 
 async function finalizeDraftIfReady() {
@@ -3071,6 +3200,14 @@ function buildSyncSnapshot() {
     draft: state.draft,
     rogueSwap: state.rogueSwap,
     heroRuntime: state.heroRuntime,
+    matchOnboarding: {
+      open: Boolean(state.matchOnboarding && state.matchOnboarding.open),
+      stepIndex: Number(state.matchOnboarding && state.matchOnboarding.stepIndex) || 0,
+      readyBySlot: {
+        human: Boolean(state.matchOnboarding && state.matchOnboarding.readyBySlot && state.matchOnboarding.readyBySlot.human),
+        bot: Boolean(state.matchOnboarding && state.matchOnboarding.readyBySlot && state.matchOnboarding.readyBySlot.bot)
+      }
+    },
     round: state.round,
     roundActionCounter: state.roundActionCounter,
     roundStarter: state.roundStarter,
@@ -3150,6 +3287,16 @@ function applySyncPayload(payload) {
         }
       }
     : createHeroRuntimeState();
+  state.matchOnboarding = snap.matchOnboarding
+    ? {
+        open: Boolean(snap.matchOnboarding.open),
+        stepIndex: clamp(Number(snap.matchOnboarding.stepIndex) || 0, 0, MATCH_ONBOARDING_STEPS.length - 1),
+        readyBySlot: {
+          human: Boolean(snap.matchOnboarding.readyBySlot && snap.matchOnboarding.readyBySlot.human),
+          bot: Boolean(snap.matchOnboarding.readyBySlot && snap.matchOnboarding.readyBySlot.bot)
+        }
+      }
+    : createMatchOnboardingState();
   state.round = Number(snap.round) || 1;
   state.roundActionCounter = Number(snap.roundActionCounter) || 0;
   state.roundStarter = snap.roundStarter || null;
@@ -3243,7 +3390,7 @@ function concludeMatch(winnerKey, reason) {
     state.profile.ranking = Math.max(0, state.profile.ranking + delta);
     state.profile.opponentRanking = Math.max(0, state.profile.opponentRanking - delta);
   }
-  applyDemoProgressAfterCompletedMatch();
+  applyProgressAfterCompletedMatch(winnerKey);
   state.phase = PHASES.matchEnd;
   state.screen = APP_SCREENS.result;
   state.matchWinner = winnerKey;
@@ -4084,6 +4231,10 @@ async function botRespondToClaim() {
 
 function applyCanonicalAction(payload) {
   if (!payload || state.screen !== APP_SCREENS.game) return;
+  if (payload.kind === "ONBOARDING_READY") {
+    applyCanonicalOnboardingReady(payload);
+    return;
+  }
   if (payload.kind === "DRAFT_ACCEPT") {
     applyCanonicalDraftAccept(payload);
     return;
@@ -4766,6 +4917,7 @@ function buildCollectionItemsForTab(tab) {
       description: meta.description,
       unlocked: unlockedCards.has(role),
       unlockText: getCollectionUnlockText("card", role),
+      cost: getRoleCost(role),
       imagePath: getRoleImagePath(role),
       fallbackText: meta.name.slice(0, 2).toUpperCase()
     };
@@ -4806,6 +4958,13 @@ function renderCollectionList() {
     textWrap.appendChild(status);
 
     row.appendChild(textWrap);
+    if (tab === "cards") {
+      const cost = document.createElement("span");
+      cost.className = "card-badge card-cost collection-card-cost";
+      const rawCost = Number(item.cost);
+      cost.textContent = Number.isFinite(rawCost) ? String(rawCost) : "0";
+      row.appendChild(cost);
+    }
     fragment.appendChild(row);
   });
 
@@ -4832,17 +4991,23 @@ function updateUI() {
   ui.avatarPreviewLabel.textContent = getAvatarMeta(state.profile.heroId).displayName;
   renderAvatar(ui.avatarPreviewArt, state.profile.heroId);
   if (ui.leagueBadgeText) ui.leagueBadgeText.textContent = formatLeagueBadgeText();
-  if (ui.leagueProgressCurrentText) ui.leagueProgressCurrentText.textContent = `Current League: ${formatLeagueBadgeText()}`;
+  if (ui.leagueProgressCurrentText) ui.leagueProgressCurrentText.textContent = formatLeagueProgressText();
 
   const claimableRewards = getClaimableRewards();
   const hasClaimable = claimableRewards.length > 0;
+  const hasClaimableHero = hasClaimableHeroRewards();
   if (ui.leagueBadgeDot) ui.leagueBadgeDot.classList.toggle("hidden", !hasClaimable);
   if (ui.collectionBtnDot) ui.collectionBtnDot.classList.toggle("hidden", !hasClaimable);
+  if (ui.avatarPreviewDot) ui.avatarPreviewDot.classList.toggle("hidden", !hasClaimableHero);
   if (ui.leagueBadgeBtn) ui.leagueBadgeBtn.classList.toggle("has-notice", hasClaimable);
   if (ui.collectionBtn) ui.collectionBtn.classList.toggle("has-notice", hasClaimable);
   if (ui.claimAllRewardsBtn) {
     ui.claimAllRewardsBtn.disabled = !hasClaimable;
     ui.claimAllRewardsBtn.textContent = hasClaimable ? `Claim All (${claimableRewards.length})` : "Claim All";
+  }
+  if (ui.cheatUnlockBtn) {
+    const canUseCheat = (Number(state.progression.matchesCompleted) || 0) >= 1;
+    ui.cheatUnlockBtn.disabled = !canUseCheat;
   }
   renderAvatarChoices();
   renderLeagueProgressTrack();
@@ -5100,6 +5265,7 @@ function openModal(modalNode) {
 function closeModal(modalNode = modalState.activeModal) {
   if (!(modalNode instanceof HTMLElement)) return;
   modalNode.classList.add("hidden");
+  if (modalNode === ui.matchOnboardingModal) stopOnboardingTypewriter();
   if (modalState.activeModal === modalNode) modalState.activeModal = null;
 }
 
@@ -5143,6 +5309,195 @@ function ensureCardBadgeRow(node) {
   }
 
   return { badgeRow, badgeLeft, badgeRight };
+}
+
+function stopOnboardingTypewriter() {
+  if (uiRuntime.onboardingTypeTimerId) {
+    clearTimeout(uiRuntime.onboardingTypeTimerId);
+    uiRuntime.onboardingTypeTimerId = null;
+  }
+}
+
+function typeOnboardingText(text) {
+  if (!ui.matchOnboardingBody) return;
+  const nextText = String(text || "");
+  uiRuntime.onboardingTypeToken += 1;
+  const token = uiRuntime.onboardingTypeToken;
+  stopOnboardingTypewriter();
+  if (!nextText) {
+    ui.matchOnboardingBody.textContent = "";
+    return;
+  }
+
+  ui.matchOnboardingBody.textContent = "";
+  let index = 0;
+  const step = () => {
+    if (token !== uiRuntime.onboardingTypeToken) return;
+    index += 1;
+    ui.matchOnboardingBody.textContent = nextText.slice(0, index);
+    if (index >= nextText.length) {
+      uiRuntime.onboardingTypeTimerId = null;
+      return;
+    }
+    uiRuntime.onboardingTypeTimerId = setTimeout(step, 22);
+  };
+  uiRuntime.onboardingTypeTimerId = setTimeout(step, 22);
+}
+
+function getOnboardingCardsForStep(stepIndex) {
+  const step = MATCH_ONBOARDING_STEPS[stepIndex] || MATCH_ONBOARDING_STEPS[0];
+  const localSlot = state.localSlot || "human";
+  const cards = Array.isArray(state.players[localSlot].cards) ? state.players[localSlot].cards : [];
+  return cards
+    .map((card, index) => ({ ...card, index }))
+    .filter((card) => Boolean(card.isReal) === Boolean(step.filterReal));
+}
+
+function renderMatchOnboardingCards(stepIndex) {
+  if (!ui.matchOnboardingCards) return;
+  ui.matchOnboardingCards.innerHTML = "";
+  const localSlot = state.localSlot || "human";
+  const cards = getOnboardingCardsForStep(stepIndex);
+  const fragment = document.createDocumentFragment();
+
+  cards.forEach((card) => {
+    const node = createRoleCardNode({
+      ownerSlot: localSlot,
+      card,
+      cardIndex: card.index,
+      asButton: false,
+      disabled: false
+    });
+    node.classList.add("onboarding-role-card");
+    fragment.appendChild(node);
+  });
+
+  if (cards.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "helper-text";
+    empty.textContent = "No cards in this category.";
+    fragment.appendChild(empty);
+  }
+
+  ui.matchOnboardingCards.appendChild(fragment);
+}
+
+function isMatchOnboardingReadyToStart() {
+  if (state.mode !== "friend") return true;
+  return Boolean(state.matchOnboarding.readyBySlot.human && state.matchOnboarding.readyBySlot.bot);
+}
+
+function maybeStartMatchAfterOnboarding() {
+  if (state.phase !== PHASES.gameStart) return;
+  if (!isMatchOnboardingReadyToStart()) return;
+  setCurrentAction("Match start.");
+  updateUI();
+  setTimeout(() => {
+    if (state.screen === APP_SCREENS.game && state.phase !== PHASES.matchEnd) beginTurn();
+  }, 220);
+}
+
+function applyCanonicalOnboardingReady(payload) {
+  if (!payload || state.screen !== APP_SCREENS.game) return;
+  const actorSlot = payload.actorSlot === "bot" ? "bot" : "human";
+  if (!state.matchOnboarding) state.matchOnboarding = createMatchOnboardingState();
+  state.matchOnboarding.readyBySlot[actorSlot] = true;
+  state.friend.pendingRequest = null;
+  if (!isMatchOnboardingReadyToStart()) {
+    if (actorSlot === state.localSlot) setCurrentAction("Waiting for opponent onboarding...");
+    updateUI();
+    return;
+  }
+  maybeStartMatchAfterOnboarding();
+}
+
+async function submitLocalMatchOnboardingReady() {
+  const localSlot = state.localSlot || "human";
+  if (!state.matchOnboarding) state.matchOnboarding = createMatchOnboardingState();
+  if (state.matchOnboarding.readyBySlot[localSlot]) {
+    maybeStartMatchAfterOnboarding();
+    return;
+  }
+
+  if (state.mode === "friend") {
+    if (net.role === "host") {
+      await net.sendEvent(
+        "ACTION",
+        {
+          kind: "ONBOARDING_READY",
+          actorSlot: localSlot
+        },
+        {
+          canonical: true,
+          actorId: state.slots[localSlot] ? state.slots[localSlot].id : net.playerId,
+          applyLocal: true
+        }
+      );
+      return;
+    }
+
+    state.friend.pendingRequest = "onboarding";
+    updateUI();
+    await net.sendEvent(
+      "ACTION",
+      {
+        kind: "ONBOARDING_READY",
+        actorSlot: localSlot,
+        requestId: `${net.playerId}-${Date.now()}-onb`
+      },
+      {
+        actorId: state.slots[localSlot] ? state.slots[localSlot].id : net.playerId,
+        seq: 0
+      }
+    );
+    return;
+  }
+
+  state.matchOnboarding.readyBySlot[localSlot] = true;
+  state.matchOnboarding.readyBySlot[opponentOf(localSlot)] = true;
+  maybeStartMatchAfterOnboarding();
+}
+
+function renderMatchOnboardingStep() {
+  if (!ui.matchOnboardingModal || !ui.matchOnboardingTitle || !ui.matchOnboardingBody || !ui.matchOnboardingNextBtn) {
+    void submitLocalMatchOnboardingReady();
+    return;
+  }
+  if (!state.matchOnboarding) state.matchOnboarding = createMatchOnboardingState();
+  const index = clamp(Number(state.matchOnboarding.stepIndex) || 0, 0, MATCH_ONBOARDING_STEPS.length - 1);
+  state.matchOnboarding.stepIndex = index;
+  const step = MATCH_ONBOARDING_STEPS[index];
+  ui.matchOnboardingTitle.textContent = step.title;
+  ui.matchOnboardingNextBtn.textContent = step.button;
+  renderMatchOnboardingCards(index);
+  typeOnboardingText(step.body);
+}
+
+async function advanceMatchOnboardingStep() {
+  if (!state.matchOnboarding) state.matchOnboarding = createMatchOnboardingState();
+  if (state.matchOnboarding.stepIndex < MATCH_ONBOARDING_STEPS.length - 1) {
+    state.matchOnboarding.stepIndex += 1;
+    renderMatchOnboardingStep();
+    return;
+  }
+  state.matchOnboarding.open = false;
+  closeModal(ui.matchOnboardingModal);
+  stopOnboardingTypewriter();
+  updateUI();
+  await submitLocalMatchOnboardingReady();
+}
+
+function openMatchOnboarding() {
+  if (!state.matchOnboarding) state.matchOnboarding = createMatchOnboardingState();
+  state.matchOnboarding.open = true;
+  state.matchOnboarding.stepIndex = 0;
+  state.matchOnboarding.readyBySlot = { human: false, bot: false };
+  if (ui.matchOnboardingModal instanceof HTMLElement) {
+    openModal(ui.matchOnboardingModal);
+    renderMatchOnboardingStep();
+    return;
+  }
+  void submitLocalMatchOnboardingReady();
 }
 
 function setTutorialCardStatusTag(node, isReal) {
@@ -5490,6 +5845,11 @@ function bindEvents() {
   ui.premiumCloseBtn.addEventListener("click", () => closeModal(ui.premiumModal));
   ui.goPremiumBtn.addEventListener("click", () => showActionToast("Available soon"));
   ui.tutorialNextBtn.addEventListener("click", () => advanceTutorialStep());
+  if (ui.matchOnboardingNextBtn) {
+    ui.matchOnboardingNextBtn.addEventListener("click", () => {
+      void advanceMatchOnboardingStep();
+    });
+  }
   ui.collectionCloseBtn.addEventListener("click", () => closeModal(ui.collectionModal));
   ui.leagueProgressCloseBtn.addEventListener("click", () => closeModal(ui.leagueProgressModal));
   ui.collectionBtn.addEventListener("click", () => {
@@ -5515,6 +5875,14 @@ function bindEvents() {
       updateUI();
     }
   });
+  if (ui.cheatUnlockBtn) {
+    ui.cheatUnlockBtn.addEventListener("click", () => {
+      const didApply = applyDemoCheatUnlock();
+      if (!didApply) return;
+      showActionToast("Demo unlock applied.");
+      updateUI();
+    });
+  }
 
   ui.collectionTabs.forEach((tabButton) => {
     tabButton.addEventListener("click", () => {
@@ -5597,6 +5965,7 @@ function bindEvents() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (modalState.activeModal === ui.matchOnboardingModal) return;
     if (state.gameEventTooltip.open) {
       closeGameEventTooltip();
       return;
@@ -5652,6 +6021,7 @@ function cacheElements() {
   ui.homeTipDots = document.getElementById("homeTipDots");
   ui.playerNameInput = document.getElementById("playerNameInput");
   ui.avatarPreviewBtn = document.getElementById("avatarPreviewBtn");
+  ui.avatarPreviewDot = document.getElementById("avatarPreviewDot");
   ui.avatarPreviewArt = document.getElementById("avatarPreviewArt");
   ui.avatarPreviewLabel = document.getElementById("avatarPreviewLabel");
 
@@ -5728,6 +6098,13 @@ function cacheElements() {
   ui.leagueProgressScroll = document.getElementById("leagueProgressScroll");
   ui.leagueProgressTrack = document.getElementById("leagueProgressTrack");
   ui.claimAllRewardsBtn = document.getElementById("claimAllRewardsBtn");
+  ui.cheatUnlockBtn = document.getElementById("cheatUnlockBtn");
+
+  ui.matchOnboardingModal = document.getElementById("matchOnboardingModal");
+  ui.matchOnboardingTitle = document.getElementById("matchOnboardingTitle");
+  ui.matchOnboardingBody = document.getElementById("matchOnboardingBody");
+  ui.matchOnboardingCards = document.getElementById("matchOnboardingCards");
+  ui.matchOnboardingNextBtn = document.getElementById("matchOnboardingNextBtn");
 
   ui.resultWinnerText = document.getElementById("resultWinnerText");
   ui.resultSummaryText = document.getElementById("resultSummaryText");
