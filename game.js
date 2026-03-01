@@ -403,8 +403,8 @@ const FIRST_MATCH_DECISION_OVERLAY = Object.freeze({
 });
 
 const FIRST_MATCH_FINAL_OVERLAY = Object.freeze({
-  title: "Your move",
-  body: "Bluff smart. Catch lies. Win the mind game.",
+  title: "No more help!",
+  body: "You’ve got this. Outplay them and go for the win.",
   button: "Play"
 });
 
@@ -1331,6 +1331,33 @@ function getUnlockedCardRoles() {
   return Array.from(unlocked).filter((role) => ROLE_CONFIG[role]);
 }
 
+function getCardCollectionOrder() {
+  const order = [];
+  const seen = new Set();
+  const pushRole = (role) => {
+    const normalizedRole = String(role || "").trim();
+    if (!ROLE_CONFIG[normalizedRole]) return;
+    if (seen.has(normalizedRole)) return;
+    seen.add(normalizedRole);
+    order.push(normalizedRole);
+  };
+
+  STARTING_UNLOCKS.cards.forEach((role) => pushRole(role));
+
+  const progressionCardRewards = [...PROGRESSION_REWARDS]
+    .filter((reward) => reward.rewardType === "card")
+    .sort((a, b) => {
+      const aSegmentIndex = LEAGUE_SEGMENT_INDEX_BY_ID[a.segmentId] ?? 0;
+      const bSegmentIndex = LEAGUE_SEGMENT_INDEX_BY_ID[b.segmentId] ?? 0;
+      if (aSegmentIndex !== bSegmentIndex) return aSegmentIndex - bSegmentIndex;
+      return (Number(a.point) || 0) - (Number(b.point) || 0);
+    });
+
+  progressionCardRewards.forEach((reward) => pushRole(reward.itemId));
+  getAllRoles().forEach((role) => pushRole(role));
+  return order;
+}
+
 function getUnlockedHeroIds() {
   const unlocked = new Set(STARTING_UNLOCKS.heroes);
   PROGRESSION_REWARDS.forEach((reward) => {
@@ -1375,6 +1402,12 @@ function ensureSelectedHeroUnlocked() {
   if (state.mode !== "friend") state.slots.human.heroId = normalized;
 }
 
+function refreshUnlockedContentState(options = {}) {
+  ensureSelectedHeroUnlocked();
+  if (!options.skipPersist) persistProgressionState();
+  if (!options.skipRerender) updateUI();
+}
+
 function setClaimPulse(rewardId) {
   uiRuntime.claimPulseRewardId = rewardId;
   if (uiRuntime.claimPulseTimerId) clearTimeout(uiRuntime.claimPulseTimerId);
@@ -1396,10 +1429,11 @@ function claimReward(rewardId, options = {}) {
   if (!options.skipXpBonus) {
     addProgressPoints(getRewardClaimXpBonus(reward));
   }
-  ensureSelectedHeroUnlocked();
+  refreshUnlockedContentState({
+    skipPersist: Boolean(options.skipPersist),
+    skipRerender: Boolean(options.skipRerender)
+  });
   if (!options.skipPulse) setClaimPulse(reward.id);
-  if (!options.skipPersist) persistProgressionState();
-  renderAvatarChoices();
   return true;
 }
 
@@ -1408,11 +1442,19 @@ function claimAllRewards() {
   if (claimable.length === 0) return 0;
   let claimed = 0;
   claimable.forEach((reward, index) => {
-    if (claimReward(reward.id, { skipPersist: true, skipPulse: index !== claimable.length - 1 })) {
+    if (
+      claimReward(reward.id, {
+        skipPersist: true,
+        skipRerender: true,
+        skipPulse: index !== claimable.length - 1
+      })
+    ) {
       claimed += 1;
     }
   });
-  if (claimed > 0) persistProgressionState();
+  if (claimed > 0) {
+    refreshUnlockedContentState({ skipPersist: false, skipRerender: false });
+  }
   return claimed;
 }
 
@@ -5198,7 +5240,7 @@ function buildCollectionItemsForTab(tab) {
   }
 
   const unlockedCards = new Set(getUnlockedCardRoles());
-  return getAllRoles().map((role) => {
+  return getCardCollectionOrder().map((role) => {
     const meta = getRoleCollectionMeta(role);
     return {
       id: role,

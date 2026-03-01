@@ -2032,6 +2032,33 @@ body.first-guide-active::before {
 
 .role-card.guide-spotlight {
   overflow: visible;
+  filter: brightness(1.22) contrast(1.14) saturate(1.2);
+  box-shadow:
+    0 0 0 2px rgba(246, 229, 123, 0.52),
+    0 0 26px rgba(255, 232, 132, 0.42),
+    0 14px 24px rgba(0, 0, 0, 0.4);
+}
+
+.role-card.guide-spotlight .card-art {
+  filter: brightness(1.35) contrast(1.18) saturate(1.2);
+}
+
+.role-card.guide-spotlight .card-text-fade {
+  background: linear-gradient(180deg, rgba(8, 8, 8, 0) 0%, rgba(8, 8, 8, 0.38) 76%, rgba(8, 8, 8, 0.56) 100%);
+}
+
+.role-card.guide-spotlight .card-text-panel {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.24) 0%, rgba(0, 0, 0, 0.54) 100%);
+}
+
+.role-card.guide-spotlight::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 55%, rgba(255, 235, 146, 0.36) 0%, rgba(255, 235, 146, 0.08) 56%, rgba(255, 235, 146, 0) 82%);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .first-guide-pulse {
