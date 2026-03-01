@@ -544,6 +544,7 @@ const state = {
   heroRuntime: createHeroRuntimeState(),
   matchOnboarding: createMatchOnboardingState(),
   firstMatchGuide: createFirstMatchGuideState(),
+  tutorialMatch: false,
   heroTooltip: { slot: null, open: false },
   gameEventId: "none",
   gameEventTooltip: { open: false },
@@ -1141,7 +1142,8 @@ function createDefaultProgressionState() {
     claimedRewardIds: Object.create(null),
     unlockedCosmetics: Object.create(null),
     rankedModeUnlocked: false,
-    firstWinBonusDate: ""
+    firstWinBonusDate: "",
+    demoUnlockApplied: false
   };
 }
 
@@ -1154,7 +1156,8 @@ function normalizeProgressionState(raw) {
     claimedRewardIds: Object.create(null),
     unlockedCosmetics: Object.create(null),
     rankedModeUnlocked: Boolean(raw.rankedModeUnlocked),
-    firstWinBonusDate: typeof raw.firstWinBonusDate === "string" ? raw.firstWinBonusDate.slice(0, 10) : ""
+    firstWinBonusDate: typeof raw.firstWinBonusDate === "string" ? raw.firstWinBonusDate.slice(0, 10) : "",
+    demoUnlockApplied: Boolean(raw.demoUnlockApplied)
   };
 
   if (raw.claimedRewardIds && typeof raw.claimedRewardIds === "object") {
@@ -1204,7 +1207,8 @@ function persistProgressionState() {
         claimedRewardIds: { ...state.progression.claimedRewardIds },
         unlockedCosmetics: { ...state.progression.unlockedCosmetics },
         rankedModeUnlocked: Boolean(state.progression.rankedModeUnlocked),
-        firstWinBonusDate: String(state.progression.firstWinBonusDate || "").slice(0, 10)
+        firstWinBonusDate: String(state.progression.firstWinBonusDate || "").slice(0, 10),
+        demoUnlockApplied: Boolean(state.progression.demoUnlockApplied)
       })
     );
   } catch (_error) {
@@ -1462,18 +1466,30 @@ function hasClaimableHeroRewards() {
   return PROGRESSION_REWARDS.some((reward) => reward.rewardType === "hero" && isRewardClaimable(reward));
 }
 
+function areAllRewardsClaimed() {
+  return PROGRESSION_REWARDS.every((reward) => isRewardClaimed(reward));
+}
+
+function shouldShowDemoResetButton() {
+  return Boolean(state.progression.demoUnlockApplied) && areAllRewardsClaimed();
+}
+
 function applyDemoCheatUnlock() {
   if ((Number(state.progression.matchesCompleted) || 0) < 1) return false;
   state.progression.points = MAX_PROGRESS_POINTS;
+  state.progression.demoUnlockApplied = true;
   PROGRESSION_REWARDS.forEach((reward) => {
     state.progression.claimedRewardIds[reward.id] = true;
     if (reward.rewardType === "skin") state.progression.unlockedCosmetics[reward.itemId] = true;
     if (reward.rewardType === "mode" && reward.itemId === "ranked") state.progression.rankedModeUnlocked = true;
   });
-  ensureSelectedHeroUnlocked();
-  persistProgressionState();
-  renderAvatarChoices();
+  refreshUnlockedContentState({ skipPersist: false, skipRerender: false });
   return true;
+}
+
+function resetDemoProgressionState() {
+  state.progression = createDefaultProgressionState();
+  refreshUnlockedContentState({ skipPersist: false, skipRerender: false });
 }
 
 function applyProgressAfterCompletedMatch(winnerKey) {
@@ -2128,6 +2144,10 @@ function isFirstScriptedBotMatchActive() {
   return Boolean(state.mode === "bot" && state.firstMatchGuide && state.firstMatchGuide.scripted);
 }
 
+function isTutorialMatchActive() {
+  return Boolean(state.mode === "bot" && state.tutorialMatch);
+}
+
 function chooseBotIdentity() {
   const unlockedHeroes = new Set(getUnlockedHeroIds());
   const candidates = BOT_IDENTITIES.filter((entry) => {
@@ -2592,6 +2612,7 @@ function resetMatchState(options = {}) {
   state.matchOnboarding = createMatchOnboardingState();
   state.firstMatchGuide = createFirstMatchGuideState();
   state.firstMatchGuide.scripted = Boolean(options.firstMatchScripted && state.mode === "bot");
+  state.tutorialMatch = Boolean(options.tutorialMatch && state.mode === "bot");
   state.heroTooltip = { slot: null, open: false };
   state.gameEventTooltip = { open: false };
   state.round = 1;
@@ -2644,6 +2665,7 @@ async function backToMenu() {
   clearPendingClaim();
   state.draft = createDraftState();
   state.matchSeed = "";
+  state.tutorialMatch = false;
   state.friend.pendingRequest = null;
   state.friend.startInFlight = false;
 
@@ -2684,7 +2706,7 @@ async function backToMenu() {
   updateUI();
 }
 
-function startBotMatch() {
+function startBotMatch(options = {}) {
   state.mode = "bot";
   state.friend.roomId = "";
   state.friend.role = null;
@@ -2702,8 +2724,9 @@ function startBotMatch() {
   state.slots.bot = { id: "bot-ai", name: botIdentity.name, heroId: botIdentity.heroId };
   state.localSlot = "human";
 
+  const tutorialMatch = Boolean(options.tutorialMatch);
   const matchSeed = generateMatchSeed();
-  const firstMatchScripted = (Number(state.progression.matchesCompleted) || 0) === 0;
+  const firstMatchScripted = tutorialMatch || (Number(state.progression.matchesCompleted) || 0) === 0;
   const gameEventId = pickRandomGameEventId();
   const starterRng = createSeededRng(`${matchSeed}:starter`);
   const draftRoles = buildDeterministicDraftRoles(matchSeed);
@@ -2714,6 +2737,7 @@ function startBotMatch() {
   const payload = {
     stage: "match-start",
     firstMatchScripted,
+    tutorialMatch,
     matchSeed,
     gameEventId,
     startingActor: firstMatchScripted ? "human" : starterRng() < 0.5 ? "human" : "bot",
@@ -3102,6 +3126,7 @@ function applyDraftFinalStart(payload) {
     matchSeed: payload.matchSeed,
     gameEventId: payload.gameEventId,
     firstMatchScripted: Boolean(payload.firstMatchScripted),
+    tutorialMatch: Boolean(payload.tutorialMatch),
     loadout: {
       human: payload.players.human,
       bot: payload.players.bot
@@ -3640,12 +3665,14 @@ function concludeMatch(winnerKey, reason) {
   if (state.phase === PHASES.matchEnd) return;
   clearTimer();
   cancelResolutionQueue();
-  if (winnerKey === "human" || winnerKey === "bot") {
+  if (!isTutorialMatchActive() && (winnerKey === "human" || winnerKey === "bot")) {
     const delta = winnerKey === state.localSlot ? 50 : -50;
     state.profile.ranking = Math.max(0, state.profile.ranking + delta);
     state.profile.opponentRanking = Math.max(0, state.profile.opponentRanking - delta);
   }
-  applyProgressAfterCompletedMatch(winnerKey);
+  if (!isTutorialMatchActive()) {
+    applyProgressAfterCompletedMatch(winnerKey);
+  }
   state.phase = PHASES.matchEnd;
   state.screen = APP_SCREENS.result;
   state.matchWinner = winnerKey;
@@ -5364,8 +5391,15 @@ function updateUI() {
     ui.claimAllRewardsBtn.textContent = hasClaimable ? `Claim All (${claimableRewards.length})` : "Claim All";
   }
   if (ui.cheatUnlockBtn) {
-    const canUseCheat = (Number(state.progression.matchesCompleted) || 0) >= 1;
-    ui.cheatUnlockBtn.disabled = !canUseCheat;
+    const resetMode = shouldShowDemoResetButton();
+    if (resetMode) {
+      ui.cheatUnlockBtn.textContent = "Reset Progression (Demo Only)";
+      ui.cheatUnlockBtn.disabled = false;
+    } else {
+      const canUseCheat = (Number(state.progression.matchesCompleted) || 0) >= 1;
+      ui.cheatUnlockBtn.textContent = "Cheat Unlock (Demo Only)";
+      ui.cheatUnlockBtn.disabled = !canUseCheat;
+    }
   }
   renderAvatarChoices();
   renderLeagueProgressTrack();
@@ -6384,7 +6418,9 @@ function bindEvents() {
   ui.tournamentsBtn.addEventListener("click", () => {
     showActionToast("Coming soon");
   });
-  ui.startTutorialBtn.addEventListener("click", () => openTutorial());
+  ui.startTutorialBtn.addEventListener("click", () => {
+    startBotMatch({ tutorialMatch: true });
+  });
 
   ui.createLinkBtn.addEventListener("click", () => {
     void createFriendRoomAsHost();
@@ -6492,9 +6528,23 @@ function bindEvents() {
   });
   if (ui.cheatUnlockBtn) {
     ui.cheatUnlockBtn.addEventListener("click", () => {
+      if (shouldShowDemoResetButton()) {
+        openModal(ui.resetProgressModal);
+        return;
+      }
       const didApply = applyDemoCheatUnlock();
       if (!didApply) return;
       showActionToast("Demo unlock applied.");
+      updateUI();
+    });
+  }
+  if (ui.resetProgressCancelBtn) {
+    ui.resetProgressCancelBtn.addEventListener("click", () => closeModal(ui.resetProgressModal));
+  }
+  if (ui.resetProgressConfirmBtn) {
+    ui.resetProgressConfirmBtn.addEventListener("click", () => {
+      closeModal(ui.resetProgressModal);
+      resetDemoProgressionState();
       updateUI();
     });
   }
@@ -6577,6 +6627,7 @@ function bindEvents() {
   bindModalDismiss(ui.premiumModal, ui.premiumCloseBtn);
   bindModalDismiss(ui.collectionModal, ui.collectionCloseBtn);
   bindModalDismiss(ui.leagueProgressModal, ui.leagueProgressCloseBtn);
+  bindModalDismiss(ui.resetProgressModal, null);
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
@@ -6723,6 +6774,9 @@ function cacheElements() {
   ui.leagueProgressTrack = document.getElementById("leagueProgressTrack");
   ui.claimAllRewardsBtn = document.getElementById("claimAllRewardsBtn");
   ui.cheatUnlockBtn = document.getElementById("cheatUnlockBtn");
+  ui.resetProgressModal = document.getElementById("resetProgressModal");
+  ui.resetProgressCancelBtn = document.getElementById("resetProgressCancelBtn");
+  ui.resetProgressConfirmBtn = document.getElementById("resetProgressConfirmBtn");
 
   ui.matchOnboardingModal = document.getElementById("matchOnboardingModal");
   ui.matchOnboardingTitle = document.getElementById("matchOnboardingTitle");

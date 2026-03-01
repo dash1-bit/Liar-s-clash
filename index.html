@@ -59,8 +59,8 @@
         <button id="rankedBtn" class="btn mode-btn mode-btn-disabled" type="button" aria-disabled="true">Ranked</button>
         <button id="tournamentsBtn" class="btn mode-btn mode-btn-disabled" type="button" aria-disabled="true">Tournaments</button>
         <div class="mode-helper">
-          <p class="helper-text mode-helper-text">First time? Learn in 20 seconds.</p>
-          <button id="startTutorialBtn" class="btn btn-secondary mode-helper-btn" type="button">Start Tutorial</button>
+          <button id="startTutorialBtn" class="btn btn-secondary mode-helper-btn" type="button">Learn the Basics</button>
+          <p class="helper-text mode-helper-text">Play a short guided match to understand the core mechanics.</p>
         </div>
       </div>
     </section>
@@ -302,6 +302,25 @@
       </div>
       <button id="claimAllRewardsBtn" class="btn mode-btn" type="button">Claim All</button>
       <button id="cheatUnlockBtn" class="btn btn-secondary mode-btn" type="button">Cheat Unlock (Demo Only)</button>
+    </div>
+  </section>
+
+  <section id="resetProgressModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Reset demo progression">
+    <div class="modal-card">
+      <h2 class="section-title">Reset Demo Progress?</h2>
+      <p class="helper-text">
+        This will reset your account to the starting state:
+      </p>
+      <ul class="helper-text">
+        <li>Only basic cards</li>
+        <li>Only one hero</li>
+        <li>No game events</li>
+        <li>Tutorial match will play again</li>
+      </ul>
+      <div class="result-actions">
+        <button id="resetProgressCancelBtn" class="btn btn-secondary mode-btn" type="button">Cancel</button>
+        <button id="resetProgressConfirmBtn" class="btn mode-btn" type="button">Reset</button>
+      </div>
     </div>
   </section>
 
