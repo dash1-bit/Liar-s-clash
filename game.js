@@ -1657,6 +1657,17 @@ function isPendingClaimCard(ownerSlot, card, cardIndex) {
   return state.pendingClaim.roleName === card.role;
 }
 
+function isFirstMatchBotKnightDecisionPending() {
+  if (!isFirstScriptedBotMatchActive()) return false;
+  if (state.phase !== PHASES.awaitingResponse) return false;
+  if (state.pendingResponder !== state.localSlot) return false;
+  const action = state.pendingAction;
+  if (!action || action.actor !== "bot" || action.kind !== "role" || action.role !== "KNIGHT") return false;
+  if (typeof action.cardIndex !== "number") return false;
+  const card = getCardByIndex("bot", action.cardIndex);
+  return Boolean(card && card.isReal === false);
+}
+
 function getAvatarPath(avatarId) {
   const normalized = normalizeHeroId(avatarId);
   const path = ASSET_MAP.heroPortraitPaths[normalized] || ASSET_MAP.heroPortraitPaths.adventurer;
@@ -4895,6 +4906,12 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     if (state.pendingClaim && Date.now() - state.pendingClaim.timestamp <= 320) {
       node.classList.add("card--pending-claim-flash");
     }
+    if (isFirstMatchBotKnightDecisionPending()) {
+      node.classList.add("card--pending-claim-pulse");
+      if (state.firstMatchGuide && state.firstMatchGuide.active && state.firstMatchGuide.overlayMode === "decision") {
+        node.classList.add("card--pending-claim-pulse-strong");
+      }
+    }
   }
 
   if (isDraftCardSelectable(ownerSlot) || isRogueSwapCardSelectable(ownerSlot)) {
@@ -5334,6 +5351,9 @@ function updateUI() {
   if (ui.avatarPreviewDot) ui.avatarPreviewDot.classList.toggle("hidden", !(canShowSecondaryDots && hasClaimableHero));
   if (ui.leagueBadgeBtn) ui.leagueBadgeBtn.classList.toggle("has-notice", hasClaimable);
   if (ui.collectionBtn) ui.collectionBtn.classList.toggle("has-notice", canShowSecondaryDots && hasClaimable);
+  if (ui.backToMenuBtn) {
+    ui.backToMenuBtn.textContent = hasClaimable ? "Unlock new reward!" : "Back to Menu";
+  }
   if (ui.claimAllRewardsBtn) {
     ui.claimAllRewardsBtn.disabled = !hasClaimable;
     ui.claimAllRewardsBtn.textContent = hasClaimable ? `Claim All (${claimableRewards.length})` : "Claim All";
@@ -6326,8 +6346,19 @@ function bindEvents() {
     void backToMenu();
   });
 
-  ui.backToMenuBtn.addEventListener("click", () => {
-    void backToMenu();
+  ui.backToMenuBtn.addEventListener("click", async () => {
+    const hasClaimable = getClaimableRewards().length > 0;
+    if (state.screen === APP_SCREENS.result && hasClaimable) {
+      await backToMenu();
+      openModal(ui.leagueProgressModal);
+      updateUI();
+      if (ui.leagueProgressScroll) {
+        const target = Math.max(0, ui.leagueProgressScroll.scrollHeight - ui.leagueProgressScroll.clientHeight);
+        ui.leagueProgressScroll.scrollTo({ top: target, behavior: "smooth" });
+      }
+      return;
+    }
+    await backToMenu();
   });
   ui.shareResultBtn.addEventListener("click", () => {
     showActionToast("Share coming soon");

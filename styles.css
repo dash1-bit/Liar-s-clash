@@ -970,6 +970,18 @@ body {
   animation: pendingClaimFlash 300ms ease-out 1;
 }
 
+.role-card.card--pending-claim-pulse {
+  animation: pendingClaimPulse 860ms ease-in-out infinite;
+}
+
+.role-card.card--pending-claim-pulse.card--pending-claim-pulse-strong {
+  animation-duration: 620ms;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 244, 198, 0.62),
+    inset 0 -14px 24px rgba(0, 0, 0, 0.35),
+    0 0 30px rgba(255, 236, 150, 0.82);
+}
+
 .card-art {
   position: absolute;
   inset: 0;
@@ -1992,6 +2004,12 @@ body.first-guide-active::before {
   pointer-events: none;
 }
 
+body.first-guide-active .player-panel.actions-locked #bottomCards,
+body.first-guide-active .player-panel.actions-locked .basic-actions {
+  opacity: 1;
+  filter: none;
+}
+
 .guide-spotlight {
   position: relative;
   isolation: isolate;
@@ -2037,6 +2055,10 @@ body.first-guide-active::before {
     0 0 0 2px rgba(246, 229, 123, 0.52),
     0 0 26px rgba(255, 232, 132, 0.42),
     0 14px 24px rgba(0, 0, 0, 0.4);
+}
+
+.role-card.guide-spotlight.is-disabled {
+  opacity: 1;
 }
 
 .role-card.guide-spotlight .card-art {
@@ -2564,6 +2586,30 @@ body.first-guide-active::before {
     box-shadow:
       inset 0 0 0 1px rgba(255, 242, 191, 0.4),
       0 0 16px rgba(255, 232, 132, 0.4);
+  }
+}
+
+@keyframes pendingClaimPulse {
+  0% {
+    transform: scale(1.02);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 242, 191, 0.38),
+      inset 0 -14px 24px rgba(0, 0, 0, 0.35),
+      0 0 18px rgba(255, 232, 132, 0.4);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 244, 198, 0.62),
+      inset 0 -14px 24px rgba(0, 0, 0, 0.35),
+      0 0 30px rgba(255, 236, 150, 0.82);
+  }
+  100% {
+    transform: scale(1.02);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 242, 191, 0.38),
+      inset 0 -14px 24px rgba(0, 0, 0, 0.35),
+      0 0 18px rgba(255, 232, 132, 0.4);
   }
 }
 
