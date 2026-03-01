@@ -346,21 +346,52 @@ const HOME_TIPS = Object.freeze([
 
 const FIRST_MATCH_GUIDE_STEPS = Object.freeze([
   Object.freeze({
+    id: "welcome",
+    title: "Welcome to Gambit Liar’s",
+    body: "Let’s learn the basics in 30 seconds. Tap anywhere to continue.",
+    button: "Next",
+    spotlightSelectors: Object.freeze([])
+  }),
+  Object.freeze({
+    id: "hp",
     title: "This is your HP",
     body: "If it reaches 0, you lose.",
     button: "Next",
     spotlightSelectors: Object.freeze(["#bottomPanel .stat-segment-hp"])
   }),
   Object.freeze({
+    id: "gold",
     title: "This is your Gold",
     body: "Spend Gold to play cards and actions.",
     button: "Next",
     spotlightSelectors: Object.freeze(["#bottomPanel .stat-segment-gold"])
   }),
   Object.freeze({
+    id: "actions",
     title: "Your turn",
     body: "Tap a basic action or play a card.",
-    button: "Got it",
+    button: "Next",
+    spotlightSelectors: Object.freeze(["#bottomPanel .basic-actions", "#bottomCards"])
+  }),
+  Object.freeze({
+    id: "real-cards",
+    title: "Your REAL cards",
+    body: "These are safe. Play them freely — they’re always REAL.",
+    button: "Next",
+    spotlightKind: "real-cards"
+  }),
+  Object.freeze({
+    id: "bluff-cards",
+    title: "Your BLUFF cards",
+    body: "Careful: if you play a BLUFF and your opponent catches it, you lose 2 HP.",
+    button: "Next",
+    spotlightKind: "bluff-cards"
+  }),
+  Object.freeze({
+    id: "ready",
+    title: "Ready",
+    body: "Now choose your move.",
+    button: "Play",
     spotlightSelectors: Object.freeze(["#bottomPanel .basic-actions", "#bottomCards"])
   })
 ]);
@@ -375,6 +406,12 @@ const FIRST_MATCH_FINAL_OVERLAY = Object.freeze({
   title: "Your move",
   body: "Bluff smart. Catch lies. Win the mind game.",
   button: "Play"
+});
+
+const FIRST_MATCH_NICE_OVERLAY = Object.freeze({
+  title: "Nice!",
+  body: "Good move. Now it’s your opponent’s turn.",
+  button: "Continue"
 });
 
 const MATCH_ONBOARDING_STEPS = Object.freeze([
@@ -456,6 +493,7 @@ const uiRuntime = {
   onboardingTypeTimerId: null,
   onboardingTypeToken: 0,
   guidePulseTimerId: null,
+  firstGuideDecisionDelayTimerId: null,
   tutorialStepIndex: 0,
   homeTipTimerId: null,
   homeTipFadeTimerId: null
@@ -1090,6 +1128,7 @@ function createFirstMatchGuideState() {
     awaitingFinalOverlay: false,
     botFirstPlayDone: false,
     botAcceptedFirstHumanCard: false,
+    niceOverlayShown: false,
     decisionOverlayShown: false,
     finalOverlayShown: false
   };
@@ -2470,6 +2509,7 @@ function applyRoundStartPassives() {
 function resetMatchState(options = {}) {
   clearTimer();
   cancelResolutionQueue();
+  clearFirstMatchDecisionGuideDelay();
   state.friend.pendingRequest = null;
 
   const gameEventId = normalizeGameEventId(options.gameEventId || "none");
@@ -2530,6 +2570,7 @@ function runToModeScreen() {
 
 async function backToMenu() {
   clearTimer();
+  clearFirstMatchDecisionGuideDelay();
   cancelResolutionQueue();
   stopCurrentActionTypewriter();
   stopOnboardingTypewriter();
@@ -3346,6 +3387,7 @@ function buildSyncSnapshot() {
       awaitingFinalOverlay: Boolean(state.firstMatchGuide && state.firstMatchGuide.awaitingFinalOverlay),
       botFirstPlayDone: Boolean(state.firstMatchGuide && state.firstMatchGuide.botFirstPlayDone),
       botAcceptedFirstHumanCard: Boolean(state.firstMatchGuide && state.firstMatchGuide.botAcceptedFirstHumanCard),
+      niceOverlayShown: Boolean(state.firstMatchGuide && state.firstMatchGuide.niceOverlayShown),
       decisionOverlayShown: Boolean(state.firstMatchGuide && state.firstMatchGuide.decisionOverlayShown),
       finalOverlayShown: Boolean(state.firstMatchGuide && state.firstMatchGuide.finalOverlayShown)
     },
@@ -3447,6 +3489,7 @@ function applySyncPayload(payload) {
         awaitingFinalOverlay: Boolean(snap.firstMatchGuide.awaitingFinalOverlay),
         botFirstPlayDone: Boolean(snap.firstMatchGuide.botFirstPlayDone),
         botAcceptedFirstHumanCard: Boolean(snap.firstMatchGuide.botAcceptedFirstHumanCard),
+        niceOverlayShown: Boolean(snap.firstMatchGuide.niceOverlayShown),
         decisionOverlayShown: Boolean(snap.firstMatchGuide.decisionOverlayShown),
         finalOverlayShown: Boolean(snap.firstMatchGuide.finalOverlayShown)
       }
@@ -3646,6 +3689,13 @@ function beginTurn() {
   }
 
   state.phase = PHASES.choosingAction;
+
+  if (isFirstScriptedBotMatchActive() && state.mode === "bot" && actor === "bot" && !state.firstMatchGuide.niceOverlayShown) {
+    clearTimer();
+    openFirstMatchNiceGuide();
+    updateUI();
+    return;
+  }
 
   if (state.mode === "bot") {
     if (actor === "human") {
@@ -3872,7 +3922,7 @@ function promptResponseForOpponent() {
     action.kind === "role" &&
     !state.firstMatchGuide.decisionOverlayShown
   ) {
-    openFirstMatchDecisionGuide();
+    scheduleFirstMatchDecisionGuide();
   }
 
   updateUI();
@@ -3929,6 +3979,7 @@ function adjustSuspicion(role, delta) {
 
 function resolveAccept() {
   if (state.phase !== PHASES.awaitingResponse) return;
+  clearFirstMatchDecisionGuideDelay();
   clearTimer();
   clearPendingClaim();
 
@@ -3952,6 +4003,7 @@ function resolveAccept() {
 
 function resolveChallenge() {
   if (state.phase !== PHASES.awaitingResponse) return;
+  clearFirstMatchDecisionGuideDelay();
   clearTimer();
   clearPendingClaim();
 
@@ -4539,6 +4591,15 @@ function submitLocalAction(input) {
 function submitLocalResponse(choice) {
   if (state.phase !== PHASES.awaitingResponse || state.pendingResponder !== state.localSlot) return;
   if (state.friend.pendingRequest) return;
+  if (
+    isFirstScriptedBotMatchActive() &&
+    state.pendingAction &&
+    state.pendingAction.actor === "bot" &&
+    state.pendingAction.kind === "role" &&
+    !state.firstMatchGuide.decisionOverlayShown
+  ) {
+    return;
+  }
   setCurrentAction(formatDecisionText(state.localSlot, choice));
   clearPendingClaim();
 
@@ -5497,6 +5558,8 @@ function closeModal(modalNode = modalState.activeModal) {
   modalNode.classList.add("hidden");
   if (modalNode === ui.matchOnboardingModal) stopOnboardingTypewriter();
   if (modalNode === ui.firstMatchGuideModal) {
+    clearFirstMatchDecisionGuideDelay();
+    document.body.classList.remove("first-guide-active");
     if (ui.appRoot) ui.appRoot.classList.remove("first-guide-active");
     clearGuideSpotlights();
     if (uiRuntime.guidePulseTimerId) {
@@ -5740,6 +5803,38 @@ function openMatchOnboarding() {
   void submitLocalMatchOnboardingReady();
 }
 
+function clearFirstMatchDecisionGuideDelay() {
+  if (uiRuntime.firstGuideDecisionDelayTimerId) {
+    clearTimeout(uiRuntime.firstGuideDecisionDelayTimerId);
+    uiRuntime.firstGuideDecisionDelayTimerId = null;
+  }
+}
+
+function getFirstMatchCardSpotlightSelectors(filterReal) {
+  const selectors = [];
+  const slot = state.localSlot || "human";
+  const cards = Array.isArray(state.players[slot] && state.players[slot].cards) ? state.players[slot].cards : [];
+  cards.forEach((card, index) => {
+    if (!card) return;
+    if (Boolean(card.isReal) !== Boolean(filterReal)) return;
+    selectors.push(`#bottomCards button[data-card-index="${index}"]`);
+  });
+  return selectors;
+}
+
+function getFirstMatchGuideSpotlightSelectors(step) {
+  if (!step) return [];
+  if (step.spotlightKind === "real-cards") {
+    const selectors = getFirstMatchCardSpotlightSelectors(true);
+    return selectors.length > 0 ? selectors : ["#bottomCards"];
+  }
+  if (step.spotlightKind === "bluff-cards") {
+    const selectors = getFirstMatchCardSpotlightSelectors(false);
+    return selectors.length > 0 ? selectors : ["#bottomCards"];
+  }
+  return Array.isArray(step.spotlightSelectors) ? step.spotlightSelectors : [];
+}
+
 function clearGuideSpotlights() {
   document.querySelectorAll(".guide-spotlight").forEach((node) => node.classList.remove("guide-spotlight"));
 }
@@ -5755,6 +5850,13 @@ function applyGuideSpotlights(selectors = []) {
 function renderFirstMatchGuideOverlay() {
   if (!ui.firstMatchGuideModal || !ui.firstMatchGuideTitle || !ui.firstMatchGuideBody || !ui.firstMatchGuideNextBtn) return;
   const guide = state.firstMatchGuide || createFirstMatchGuideState();
+  if (guide.overlayMode === "nice") {
+    ui.firstMatchGuideTitle.textContent = FIRST_MATCH_NICE_OVERLAY.title;
+    ui.firstMatchGuideBody.textContent = FIRST_MATCH_NICE_OVERLAY.body;
+    ui.firstMatchGuideNextBtn.textContent = FIRST_MATCH_NICE_OVERLAY.button;
+    applyGuideSpotlights([]);
+    return;
+  }
   if (guide.overlayMode === "decision") {
     ui.firstMatchGuideTitle.textContent = FIRST_MATCH_DECISION_OVERLAY.title;
     ui.firstMatchGuideBody.textContent = FIRST_MATCH_DECISION_OVERLAY.body;
@@ -5773,7 +5875,7 @@ function renderFirstMatchGuideOverlay() {
   ui.firstMatchGuideTitle.textContent = step.title;
   ui.firstMatchGuideBody.textContent = step.body;
   ui.firstMatchGuideNextBtn.textContent = step.button;
-  applyGuideSpotlights(step.spotlightSelectors || []);
+  applyGuideSpotlights(getFirstMatchGuideSpotlightSelectors(step));
 }
 
 function openFirstMatchGuideOverlay(mode) {
@@ -5781,6 +5883,7 @@ function openFirstMatchGuideOverlay(mode) {
   if (!(ui.firstMatchGuideModal instanceof HTMLElement)) return;
   state.firstMatchGuide.active = true;
   state.firstMatchGuide.overlayMode = mode;
+  document.body.classList.add("first-guide-active");
   if (ui.appRoot) ui.appRoot.classList.add("first-guide-active");
   openModal(ui.firstMatchGuideModal);
   renderFirstMatchGuideOverlay();
@@ -5817,6 +5920,7 @@ function openFirstMatchDecisionGuide() {
   if (!isFirstScriptedBotMatchActive()) return;
   if (state.firstMatchGuide.decisionOverlayShown) return;
   state.firstMatchGuide.decisionOverlayShown = true;
+  clearFirstMatchDecisionGuideDelay();
   openFirstMatchGuideOverlay("decision");
 }
 
@@ -5825,6 +5929,29 @@ function openFirstMatchFinalGuide() {
   if (state.firstMatchGuide.finalOverlayShown) return;
   state.firstMatchGuide.finalOverlayShown = true;
   openFirstMatchGuideOverlay("final");
+}
+
+function openFirstMatchNiceGuide() {
+  if (!isFirstScriptedBotMatchActive()) return;
+  if (state.firstMatchGuide.niceOverlayShown) return;
+  state.firstMatchGuide.niceOverlayShown = true;
+  openFirstMatchGuideOverlay("nice");
+}
+
+function scheduleFirstMatchDecisionGuide() {
+  if (!isFirstScriptedBotMatchActive()) return;
+  if (state.firstMatchGuide.decisionOverlayShown) return;
+  clearFirstMatchDecisionGuideDelay();
+  uiRuntime.firstGuideDecisionDelayTimerId = setTimeout(() => {
+    uiRuntime.firstGuideDecisionDelayTimerId = null;
+    if (!isFirstScriptedBotMatchActive()) return;
+    if (state.phase !== PHASES.awaitingResponse || state.pendingResponder !== "human") return;
+    const action = state.pendingAction;
+    if (!action || action.actor !== "bot" || action.kind !== "role") return;
+    if (state.firstMatchGuide.decisionOverlayShown) return;
+    openFirstMatchDecisionGuide();
+    updateUI();
+  }, 1000);
 }
 
 function ensureFirstMatchBotKnightBluff() {
@@ -5851,6 +5978,20 @@ function advanceFirstMatchGuideOverlay() {
   if (!isFirstScriptedBotMatchActive()) return;
   if (!state.firstMatchGuide.active) return;
   const mode = state.firstMatchGuide.overlayMode || "intro";
+
+  clearFirstMatchDecisionGuideDelay();
+
+  if (mode === "nice") {
+    state.firstMatchGuide.active = false;
+    closeModal(ui.firstMatchGuideModal);
+    clearGuideSpotlights();
+    updateUI();
+    if (state.phase === PHASES.choosingAction && state.currentActor === "bot" && state.mode === "bot") {
+      clearTimer();
+      void botTakeTurn();
+    }
+    return;
+  }
 
   if (mode === "decision") {
     state.firstMatchGuide.active = false;
@@ -5880,7 +6021,7 @@ function advanceFirstMatchGuideOverlay() {
   closeModal(ui.firstMatchGuideModal);
   clearGuideSpotlights();
   updateUI();
-  openMatchOnboarding();
+  void submitLocalMatchOnboardingReady();
 }
 
 function setTutorialCardStatusTag(node, isReal) {
@@ -6234,7 +6375,15 @@ function bindEvents() {
     });
   }
   if (ui.firstMatchGuideNextBtn) {
-    ui.firstMatchGuideNextBtn.addEventListener("click", () => {
+    ui.firstMatchGuideNextBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      advanceFirstMatchGuideOverlay();
+    });
+  }
+  if (ui.firstMatchGuideModal) {
+    ui.firstMatchGuideModal.addEventListener("click", () => {
+      if (!isFirstScriptedBotMatchActive()) return;
+      if (!state.firstMatchGuide || !state.firstMatchGuide.active) return;
       advanceFirstMatchGuideOverlay();
     });
   }
