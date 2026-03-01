@@ -17,10 +17,15 @@
         <p class="home-tagline">Win the mind game.</p>
       </div>
       <div class="screen-card home-card">
-        <div class="home-stats-row">
-          <p class="level-pill">Level <span id="homeLevelValue">1</span></p>
-          <p class="level-pill">Ranking <span id="homeRankingValue">1000</span></p>
-        </div>
+        <button id="leagueBadgeBtn" class="league-badge-btn" type="button" aria-label="Open League progression">
+          <span class="league-badge-label">League</span>
+          <span id="leagueBadgeText" class="league-badge-text">WOOD III</span>
+          <span id="leagueBadgeDot" class="notify-dot hidden" aria-hidden="true"></span>
+        </button>
+        <button id="collectionBtn" class="btn btn-secondary collection-open-btn" type="button">
+          Collection
+          <span id="collectionBtnDot" class="notify-dot hidden" aria-hidden="true"></span>
+        </button>
 
         <p class="field-label profile-hero-label">Hero</p>
         <button id="avatarPreviewBtn" class="avatar-preview" type="button" aria-label="Choose hero">
@@ -50,6 +55,7 @@
         <p class="helper-text mode-subtitle">Choose Mode</p>
         <button id="playBotBtn" class="btn mode-btn" type="button">Play vs Bot</button>
         <button id="playFriendBtn" class="btn mode-btn" type="button">Play vs a Friend</button>
+        <button id="rankedBtn" class="btn mode-btn mode-btn-disabled" type="button" aria-disabled="true">Ranked</button>
         <button id="tournamentsBtn" class="btn mode-btn mode-btn-disabled" type="button" aria-disabled="true">Tournaments</button>
         <div class="mode-helper">
           <p class="helper-text mode-helper-text">First time? Learn in 20 seconds.</p>
@@ -283,15 +289,32 @@
     </div>
   </section>
 
-  <section id="levelUnlockModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Level unlock">
-    <div class="modal-card level-unlock-card">
-      <h2 class="section-title">Congratulations!</h2>
-      <p id="levelUnlockLevelText" class="helper-text">You reached Level 2.</p>
-      <div class="level-unlock-role">
-        <img id="levelUnlockImage" class="level-unlock-thumb" alt="Unlocked card" />
-        <p id="levelUnlockRoleText" class="helper-text">New card unlocked: JOKER</p>
+  <section id="leagueProgressModal" class="modal-overlay league-progress-modal hidden" role="dialog" aria-modal="true" aria-label="League progression">
+    <div class="league-progress-shell">
+      <header class="league-progress-topbar">
+        <h2 class="section-title league-progress-title">League Progression</h2>
+        <button id="leagueProgressCloseBtn" class="modal-close-btn" type="button" aria-label="Close League progression">X</button>
+      </header>
+      <p id="leagueProgressCurrentText" class="helper-text league-progress-current">Current League: WOOD III</p>
+      <div id="leagueProgressScroll" class="league-progress-scroll">
+        <div id="leagueProgressTrack" class="league-progress-track"></div>
       </div>
-      <button id="levelUnlockCloseBtn" class="btn mode-btn" type="button">Nice!</button>
+      <button id="claimAllRewardsBtn" class="btn mode-btn" type="button">Claim All</button>
+    </div>
+  </section>
+
+  <section id="collectionModal" class="modal-overlay collection-modal hidden" role="dialog" aria-modal="true" aria-label="Collection">
+    <div class="collection-shell">
+      <header class="collection-topbar">
+        <h2 class="section-title collection-title">Collection</h2>
+        <button id="collectionCloseBtn" class="modal-close-btn" type="button" aria-label="Close collection">X</button>
+      </header>
+      <div class="collection-tabs" role="tablist" aria-label="Collection tabs">
+        <button class="collection-tab active" type="button" data-collection-tab data-tab="cards" aria-pressed="true">Cards</button>
+        <button class="collection-tab" type="button" data-collection-tab data-tab="heroes" aria-pressed="false">Heroes</button>
+        <button class="collection-tab" type="button" data-collection-tab data-tab="events" aria-pressed="false">Game Events</button>
+      </div>
+      <div id="collectionList" class="collection-list" aria-label="Collection items"></div>
     </div>
   </section>
 

@@ -259,6 +259,64 @@ body {
   text-align: center;
 }
 
+.league-badge-btn {
+  width: 100%;
+  min-height: 58px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2f2d29, #262421);
+  color: #f4f3ef;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  position: relative;
+  cursor: pointer;
+}
+
+.league-badge-label {
+  margin: 0;
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c8c7c4;
+  font-weight: 800;
+}
+
+.league-badge-text {
+  margin: 0;
+  font-size: clamp(0.96rem, 2.7vw, 1.1rem);
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #f7de99;
+}
+
+.league-badge-btn.has-notice {
+  box-shadow:
+    0 0 0 1px rgba(229, 80, 80, 0.38),
+    0 0 16px rgba(229, 80, 80, 0.22);
+}
+
+.collection-open-btn {
+  width: 100%;
+  position: relative;
+}
+
+.collection-open-btn.has-notice {
+  border-color: rgba(229, 80, 80, 0.72);
+}
+
+.notify-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #e54d4d;
+  box-shadow: 0 0 0 2px rgba(10, 10, 10, 0.7);
+}
+
 .helper-text {
   margin: 0;
   color: var(--muted);
@@ -1496,6 +1554,317 @@ body {
   padding: 0;
 }
 
+.league-progress-modal,
+.collection-modal {
+  padding: 0;
+}
+
+.league-progress-shell,
+.collection-shell {
+  width: min(100vw, 430px);
+  height: 100dvh;
+  border-left: 1px solid rgba(132, 127, 118, 0.35);
+  border-right: 1px solid rgba(132, 127, 118, 0.35);
+  background: linear-gradient(180deg, #232220 0%, #1a1918 100%);
+  padding: calc(var(--pad) + env(safe-area-inset-top)) var(--pad) calc(var(--pad) + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 10px;
+}
+
+.league-progress-shell {
+  grid-template-rows: auto auto 1fr auto;
+}
+
+.collection-shell {
+  grid-template-rows: auto auto 1fr;
+}
+
+.league-progress-topbar,
+.collection-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding-right: calc(var(--tap) + 8px);
+}
+
+.league-progress-title,
+.collection-title {
+  font-size: clamp(1.08rem, 3.3vw, 1.38rem);
+}
+
+.league-progress-current {
+  text-align: center;
+  font-weight: 800;
+  color: #f7de99;
+}
+
+.league-progress-scroll {
+  border: 1px solid rgba(117, 112, 104, 0.54);
+  border-radius: 12px;
+  background: rgba(30, 28, 25, 0.9);
+  padding: 10px;
+  overflow: auto;
+}
+
+.league-progress-track {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+
+.league-progress-track::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(129, 182, 76, 0.3), rgba(129, 182, 76, 0.74));
+}
+
+.league-track-intro {
+  position: relative;
+  z-index: 1;
+  border: 1px solid rgba(129, 182, 76, 0.48);
+  border-radius: 10px;
+  padding: 8px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: #e6f2d8;
+  background: rgba(42, 58, 29, 0.35);
+  text-align: center;
+}
+
+.league-track-section-label {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #c9c8c5;
+  padding: 2px 0;
+}
+
+.league-track-row {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 30px 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 86px;
+}
+
+.league-track-slot {
+  min-width: 0;
+}
+
+.league-track-center {
+  display: grid;
+  place-items: center;
+}
+
+.league-track-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(129, 182, 76, 0.88);
+  background: rgba(19, 29, 10, 0.96);
+}
+
+.league-track-card {
+  width: 100%;
+  border: 1px solid rgba(116, 111, 103, 0.58);
+  border-radius: 12px;
+  background: rgba(45, 42, 37, 0.96);
+  color: #f2f1ee;
+  padding: 9px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  position: relative;
+}
+
+.league-track-card-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.league-track-thumb {
+  width: 34px;
+  height: 42px;
+  border-radius: 8px;
+  border: 1px solid rgba(122, 117, 109, 0.62);
+  background-color: #1f1d1a;
+  background-size: cover;
+  background-position: center;
+  display: inline-grid;
+  place-items: center;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.league-track-thumb-fallback {
+  color: #f3f3ef;
+  background-image: linear-gradient(180deg, #3a3733, #252321);
+}
+
+.league-track-card-locked {
+  filter: grayscale(0.95);
+  opacity: 0.72;
+}
+
+.league-track-card-claimable {
+  border-color: rgba(229, 80, 80, 0.72);
+  box-shadow: 0 0 0 1px rgba(229, 80, 80, 0.3), 0 0 14px rgba(229, 80, 80, 0.22);
+}
+
+.league-track-card-claimed {
+  border-color: rgba(129, 182, 76, 0.76);
+}
+
+.league-track-card-pop {
+  animation: claimPop 360ms ease-out 1;
+}
+
+.league-track-card-title {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 900;
+}
+
+.league-track-card-meta {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: #d0cfcb;
+  line-height: 1.25;
+}
+
+.league-track-state-icon {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  color: #f6f6f2;
+}
+
+.league-track-dot-notice {
+  top: 7px;
+  right: 7px;
+}
+
+.collection-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.collection-tab {
+  border: 1px solid rgba(115, 111, 102, 0.66);
+  border-radius: 10px;
+  min-height: 38px;
+  background: rgba(40, 37, 33, 0.92);
+  color: #e8e7e4;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.collection-tab.active {
+  border-color: rgba(129, 182, 76, 0.82);
+  background: rgba(129, 182, 76, 0.2);
+  color: #f5f8f2;
+}
+
+.collection-list {
+  border: 1px solid rgba(117, 112, 104, 0.54);
+  border-radius: 12px;
+  background: rgba(30, 28, 25, 0.9);
+  overflow: auto;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.collection-item {
+  border: 1px solid rgba(113, 109, 102, 0.6);
+  border-radius: 10px;
+  background: rgba(42, 39, 35, 0.95);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.collection-item-locked {
+  filter: grayscale(0.95);
+  opacity: 0.72;
+}
+
+.collection-thumb {
+  width: 48px;
+  height: 62px;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 120, 112, 0.6);
+  object-fit: cover;
+  background: #1f1e1c;
+}
+
+.collection-thumb-fallback {
+  display: grid;
+  place-items: center;
+  font-size: var(--fs-xs);
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #f6f5f1;
+  background: linear-gradient(180deg, #3b3834, #262421);
+}
+
+.collection-item-text {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.collection-item-title {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 900;
+}
+
+.collection-item-desc {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: #d5d3cf;
+  line-height: 1.25;
+}
+
+.collection-item-status {
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+}
+
+.collection-item-status-unlocked {
+  color: #8fd25f;
+}
+
+.collection-item-status-locked {
+  color: #e3c582;
+}
+
 .tutorial-shell {
   width: min(100vw, 430px);
   height: 100dvh;
@@ -2081,6 +2450,18 @@ body {
     box-shadow:
       0 0 0 1px rgba(129, 182, 76, 0.36),
       0 0 12px rgba(129, 182, 76, 0.2);
+  }
+}
+
+@keyframes claimPop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 
