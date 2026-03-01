@@ -38,7 +38,7 @@ const MATCH_SETTINGS = Object.freeze({
 });
 
 const ROLE_CONFIG = Object.freeze({
-  SIREN: Object.freeze({ name: "SIREN", cost: 0, description: "Skip next turn", passive: false }),
+  SIREN: Object.freeze({ name: "SIREN", cost: 1, description: "1 DMG + skip next action", passive: false }),
   DWARF: Object.freeze({ name: "DWARF", cost: 1, description: "Shield next DMG", passive: false }),
   KNIGHT: Object.freeze({ name: "KNIGHT", cost: 2, description: "2 DMG", passive: false }),
   GOBLIN: Object.freeze({ name: "GOBLIN", cost: 0, description: "Steal 1 Gold", maxUses: 3, passive: false }),
@@ -49,7 +49,7 @@ const ROLE_CONFIG = Object.freeze({
   JOKER: Object.freeze({ name: "JOKER", cost: 1, description: "1 DMG then transform", passive: false }),
   BERSERK: Object.freeze({ name: "BERSERK", cost: 0, description: "Self -1 HP enemy -2 HP", passive: false }),
   BANKER: Object.freeze({ name: "BANKER", cost: 3, description: "+1 Gold / round", passive: false }),
-  ANGEL: Object.freeze({ name: "ANGEL", cost: 1, description: "Swap HP and Gold", maxUses: 1, passive: false }),
+  ANGEL: Object.freeze({ name: "ANGEL", cost: 0, description: "Swap HP and Gold", maxUses: 1, passive: false }),
   VALK: Object.freeze({ name: "VALK", cost: 3, description: "Enemy -1 HP self +1 HP", passive: false }),
   APPRENTICE: Object.freeze({ name: "APPRENTICE", cost: 2, description: "Scales each round", passive: false, apprentice: true })
 });
@@ -293,7 +293,7 @@ const PROGRESSION_REWARD_BY_ID = Object.freeze(
 );
 
 const ROLE_COLLECTION_META = Object.freeze({
-  SIREN: Object.freeze({ name: "Siren", description: "Skip opponent next action." }),
+  SIREN: Object.freeze({ name: "Siren", description: "Deal 1 damage and skip opponent next action." }),
   DWARF: Object.freeze({ name: "Dwarf", description: "Gain Shield for the next damage." }),
   KNIGHT: Object.freeze({ name: "Knight", description: "Deal 2 damage." }),
   GOBLIN: Object.freeze({ name: "Goblin", description: "Steal 1 Gold (max 3 uses)." }),
@@ -465,7 +465,7 @@ const BOT_IDENTITIES = Object.freeze([
 ]);
 
 const RULES_ROLE_DETAILS = Object.freeze([
-  Object.freeze({ role: "SIREN", text: "Skip opponent next action" }),
+  Object.freeze({ role: "SIREN", text: "1 damage + skip opponent next action (1 Gold)" }),
   Object.freeze({ role: "DWARF", text: "Shield next damage (1 Gold)" }),
   Object.freeze({ role: "KNIGHT", text: "2 damage (2 Gold)" }),
   Object.freeze({ role: "GOBLIN", text: "Steal 1 Gold (max 3)" }),
@@ -476,7 +476,7 @@ const RULES_ROLE_DETAILS = Object.freeze([
   Object.freeze({ role: "JOKER", text: "1 damage (1 Gold), then transforms" }),
   Object.freeze({ role: "BERSERK", text: "Self -1 HP, enemy -2 HP" }),
   Object.freeze({ role: "BANKER", text: "Activate +1 Gold / round buff (2 Gold)" }),
-  Object.freeze({ role: "ANGEL", text: "Swap HP and Gold (1 Gold, max 1)" }),
+  Object.freeze({ role: "ANGEL", text: "Swap HP and Gold (0 Gold, max 1)" }),
   Object.freeze({ role: "VALK", text: "Enemy -1 HP, self +1 HP (3 Gold)" }),
   Object.freeze({ role: "APPRENTICE", label: "ADEPT", text: "X damage, cost X+1, scales each round (cap 5/6)" })
 ]);
@@ -1718,6 +1718,11 @@ function renderRoleDescription(node, role, card = null) {
   };
 
   switch (role) {
+    case "SIREN":
+      appendText(node, "1 ");
+      icon("sword");
+      appendText(node, " + skip next action");
+      break;
     case "DWARF":
       icon("shield");
       appendText(node, " Shield next ");
@@ -4109,6 +4114,7 @@ function applyEffect(action) {
 
   switch (action.role) {
     case "SIREN":
+      applyDamage(target, 1, "SIREN");
       state.players[target].blockedActions += 1;
       break;
     case "DWARF":
@@ -4885,8 +4891,9 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
 
   const draftMode = isDraftPhase();
   const cardVerified = card.verification === "REAL" || card.verification === "FAKE";
+  const pendingClaimCard = isPendingClaimCard(ownerSlot, card, cardIndex);
   const hideOpponentCardDetails =
-    ownerSlot !== state.localSlot && isFogOfWarActive() && !draftMode && !card.revealedUsed && !cardVerified;
+    ownerSlot !== state.localSlot && isFogOfWarActive() && !draftMode && !card.revealedUsed && !cardVerified && !pendingClaimCard;
 
   if (ownerSlot === state.localSlot) {
     if (!draftMode) {
@@ -4900,17 +4907,14 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     if (hideOpponentCardDetails) node.classList.add("opponent-hidden");
   }
 
-  const pendingClaimCard = isPendingClaimCard(ownerSlot, card, cardIndex);
   if (pendingClaimCard) {
     node.classList.add("card--pending-claim");
+    node.classList.add("card--pending-claim-pulse");
     if (state.pendingClaim && Date.now() - state.pendingClaim.timestamp <= 320) {
       node.classList.add("card--pending-claim-flash");
     }
-    if (isFirstMatchBotKnightDecisionPending()) {
-      node.classList.add("card--pending-claim-pulse");
-      if (state.firstMatchGuide && state.firstMatchGuide.active && state.firstMatchGuide.overlayMode === "decision") {
-        node.classList.add("card--pending-claim-pulse-strong");
-      }
+    if (isFirstMatchBotKnightDecisionPending() && state.firstMatchGuide && state.firstMatchGuide.active && state.firstMatchGuide.overlayMode === "decision") {
+      node.classList.add("card--pending-claim-pulse-strong");
     }
   }
 
@@ -4972,7 +4976,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     hasBadge = true;
   }
 
-  if (!hideOpponentCardDetails && meta && roleCost > 0) {
+  if (!hideOpponentCardDetails && meta && (roleCost > 0 || card.role === "ANGEL")) {
     const cost = document.createElement("span");
     cost.className = "card-badge card-cost";
     cost.textContent = String(roleCost);
