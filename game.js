@@ -5357,6 +5357,7 @@ function updateUI() {
   if (ui.collectionBtn) ui.collectionBtn.classList.toggle("has-notice", canShowSecondaryDots && hasClaimable);
   if (ui.backToMenuBtn) {
     ui.backToMenuBtn.textContent = hasClaimable ? "Unlock new reward!" : "Back to Menu";
+    ui.backToMenuBtn.classList.toggle("result-unlock-cta", state.screen === APP_SCREENS.result && hasClaimable);
   }
   if (ui.claimAllRewardsBtn) {
     ui.claimAllRewardsBtn.disabled = !hasClaimable;

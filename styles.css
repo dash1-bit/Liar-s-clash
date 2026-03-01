@@ -1403,6 +1403,15 @@ body {
   gap: 8px;
 }
 
+.result-actions .btn.result-unlock-cta {
+  background: linear-gradient(180deg, #f9d76f 0%, #e2b642 100%);
+  border-color: #c9972d;
+  color: #000;
+  text-shadow: none;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
+  animation: rewardCtaPulse 1.2s ease-in-out infinite;
+}
+
 .result-summary-card {
   margin: auto 0;
   gap: 9px;
@@ -2682,6 +2691,18 @@ body.first-guide-active .player-panel.actions-locked .basic-actions {
     box-shadow: 0 0 0 0 rgba(129, 182, 76, 0.14);
     background: rgba(23, 22, 20, 0.98);
     border-top-color: #0f0e0d;
+  }
+}
+
+@keyframes rewardCtaPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 
