@@ -177,6 +177,12 @@ const LEAGUE_SEGMENT_BY_ID = Object.freeze(
     return acc;
   }, Object.create(null))
 );
+const LEAGUE_SEGMENT_INDEX_BY_ID = Object.freeze(
+  LEAGUE_SEGMENTS.reduce((acc, segment, index) => {
+    acc[segment.id] = index;
+    return acc;
+  }, Object.create(null))
+);
 
 const STARTING_UNLOCKS = Object.freeze({
   cards: Object.freeze(["KNIGHT", "GOBLIN", "SIREN", "ELF"]),
@@ -330,13 +336,46 @@ const HOME_TIPS = Object.freeze([
   "Save gold for high-impact turns.",
   "If they hesitate, they might be lying.",
   "Use reveals to reduce uncertainty, not to show off.",
-  "Track which cards are REAL/FAKE as the match evolves.",
+  "Track which cards are REAL/BLUFF as the match evolves.",
   "Don\u2019t accuse on impulse\u2014accuse when the risk is worth it.",
   "Rogue can swap cards only on their first turn.",
   "Pressure low HP opponents\u2014force tough decisions.",
   "Sometimes ACCEPT is the best punish.",
   "Win the mind game, not just the numbers."
 ]);
+
+const FIRST_MATCH_GUIDE_STEPS = Object.freeze([
+  Object.freeze({
+    title: "This is your HP",
+    body: "If it reaches 0, you lose.",
+    button: "Next",
+    spotlightSelectors: Object.freeze(["#bottomPanel .stat-segment-hp"])
+  }),
+  Object.freeze({
+    title: "This is your Gold",
+    body: "Spend Gold to play cards and actions.",
+    button: "Next",
+    spotlightSelectors: Object.freeze(["#bottomPanel .stat-segment-gold"])
+  }),
+  Object.freeze({
+    title: "Your turn",
+    body: "Tap a basic action or play a card.",
+    button: "Got it",
+    spotlightSelectors: Object.freeze(["#bottomPanel .basic-actions", "#bottomCards"])
+  })
+]);
+
+const FIRST_MATCH_DECISION_OVERLAY = Object.freeze({
+  title: "Accept or call BLUFF?",
+  body: "Your opponent played a card.\nTap ACCEPT to take the effect...\nor tap YOU'RE LYING! to challenge.\nCatch a BLUFF: they lose 2 HP.\nWrong accuse: you lose 1 HP.",
+  button: "Choose"
+});
+
+const FIRST_MATCH_FINAL_OVERLAY = Object.freeze({
+  title: "Your move",
+  body: "Bluff smart. Catch lies. Win the mind game.",
+  button: "Play"
+});
 
 const MATCH_ONBOARDING_STEPS = Object.freeze([
   Object.freeze({
@@ -385,8 +424,7 @@ const TUTORIAL_SAMPLE_CARDS = Object.freeze([
 
 const BOT_IDENTITIES = Object.freeze([
   Object.freeze({ name: "Hikaru", heroId: "noble" }),
-  Object.freeze({ name: "Danny", heroId: "adventurer" }),
-  Object.freeze({ name: "MrBeast", heroId: "rogue" })
+  Object.freeze({ name: "Danny", heroId: "adventurer" })
 ]);
 
 const RULES_ROLE_DETAILS = Object.freeze([
@@ -417,6 +455,7 @@ const uiRuntime = {
   claimPulseTimerId: null,
   onboardingTypeTimerId: null,
   onboardingTypeToken: 0,
+  guidePulseTimerId: null,
   tutorialStepIndex: 0,
   homeTipTimerId: null,
   homeTipFadeTimerId: null
@@ -466,6 +505,7 @@ const state = {
   rogueSwap: createRogueSwapState(),
   heroRuntime: createHeroRuntimeState(),
   matchOnboarding: createMatchOnboardingState(),
+  firstMatchGuide: createFirstMatchGuideState(),
   heroTooltip: { slot: null, open: false },
   gameEventId: "none",
   gameEventTooltip: { open: false },
@@ -1038,6 +1078,20 @@ function createMatchOnboardingState() {
     open: false,
     stepIndex: 0,
     readyBySlot: { human: false, bot: false }
+  };
+}
+
+function createFirstMatchGuideState() {
+  return {
+    scripted: false,
+    active: false,
+    overlayMode: null,
+    stepIndex: 0,
+    awaitingFinalOverlay: false,
+    botFirstPlayDone: false,
+    botAcceptedFirstHumanCard: false,
+    decisionOverlayShown: false,
+    finalOverlayShown: false
   };
 }
 
@@ -1694,6 +1748,8 @@ function applyAssetCssVariables() {
 function createStatSegment(iconKey, text) {
   const segment = document.createElement("span");
   segment.className = "stat-segment";
+  const normalizedIconKey = String(iconKey || "").toLowerCase().trim();
+  if (normalizedIconKey) segment.classList.add(`stat-segment-${normalizedIconKey}`);
   if (String(text).toLowerCase() === "shield") segment.classList.add("stat-segment-shield");
   const icon = createInlineIcon(iconKey, "stat-icon");
   if (icon) segment.appendChild(icon);
@@ -1762,6 +1818,60 @@ function getInvalidActionFeedback(input) {
   if (player.gold < getRoleCost(card.role, card)) return "Not enough gold.";
   if (!canUseRoleByUses(state.localSlot, card.role)) return "Uses exhausted.";
   return null;
+}
+
+function canTriggerInvalidTapHint() {
+  if (state.screen !== APP_SCREENS.game) return false;
+  if (state.phase !== PHASES.choosingAction) return false;
+  if (state.currentActor !== state.localSlot) return false;
+  if (state.friend.pendingRequest) return false;
+  if (state.matchOnboarding && state.matchOnboarding.open) return false;
+  if (state.firstMatchGuide && state.firstMatchGuide.active) return false;
+  if (modalState.activeModal) return false;
+  return true;
+}
+
+function collectValidActionHintNodes() {
+  const nodes = [];
+  const pushNode = (node) => {
+    if (!(node instanceof HTMLElement)) return;
+    if (nodes.includes(node)) return;
+    nodes.push(node);
+  };
+
+  if (ui.interestBtn && ui.interestBtn.getAttribute("aria-disabled") === "false") pushNode(ui.interestBtn);
+  if (ui.strikeBtn && ui.strikeBtn.getAttribute("aria-disabled") === "false") pushNode(ui.strikeBtn);
+  if (ui.bottomCards) {
+    ui.bottomCards.querySelectorAll("button[data-card-index][aria-disabled='false']").forEach((node) => {
+      pushNode(node);
+    });
+  }
+
+  return nodes;
+}
+
+function triggerInvalidTapHint() {
+  if (!canTriggerInvalidTapHint()) return;
+  const nodes = collectValidActionHintNodes();
+  if (nodes.length === 0) return;
+
+  nodes.forEach((node) => node.classList.remove("valid-action-hint"));
+  void nodes[0].offsetWidth;
+  nodes.forEach((node) => node.classList.add("valid-action-hint"));
+  setTimeout(() => {
+    nodes.forEach((node) => node.classList.remove("valid-action-hint"));
+  }, 520);
+}
+
+function isValidActionTapTarget(target) {
+  if (!(target instanceof Element)) return false;
+  const interestTarget = target.closest("#interestBtn");
+  if (interestTarget instanceof HTMLElement && interestTarget.getAttribute("aria-disabled") === "false") return true;
+  const strikeTarget = target.closest("#strikeBtn");
+  if (strikeTarget instanceof HTMLElement && strikeTarget.getAttribute("aria-disabled") === "false") return true;
+  const cardTarget = target.closest("#bottomCards button[data-card-index]");
+  if (cardTarget instanceof HTMLElement && cardTarget.getAttribute("aria-disabled") === "false") return true;
+  return false;
 }
 
 function opponentOf(slot) {
@@ -1917,9 +2027,16 @@ function shouldTriggerRogueSwap(slot) {
   return true;
 }
 
+function isFirstScriptedBotMatchActive() {
+  return Boolean(state.mode === "bot" && state.firstMatchGuide && state.firstMatchGuide.scripted);
+}
+
 function chooseBotIdentity() {
   const unlockedHeroes = new Set(getUnlockedHeroIds());
-  const candidates = BOT_IDENTITIES.filter((entry) => unlockedHeroes.has(normalizeHeroId(entry.heroId)));
+  const candidates = BOT_IDENTITIES.filter((entry) => {
+    const heroId = normalizeHeroId(entry.heroId);
+    return heroId !== "rogue" && unlockedHeroes.has(heroId);
+  });
   const pool = candidates.length > 0 ? candidates : [Object.freeze({ name: "Danny", heroId: "adventurer" })];
   const index = Math.floor(Math.random() * pool.length);
   return pool[index] || pool[0];
@@ -2375,6 +2492,8 @@ function resetMatchState(options = {}) {
   state.rogueSwap = createRogueSwapState();
   state.heroRuntime = createHeroRuntimeState();
   state.matchOnboarding = createMatchOnboardingState();
+  state.firstMatchGuide = createFirstMatchGuideState();
+  state.firstMatchGuide.scripted = Boolean(options.firstMatchScripted && state.mode === "bot");
   state.heroTooltip = { slot: null, open: false };
   state.gameEventTooltip = { open: false };
   state.round = 1;
@@ -2485,6 +2604,7 @@ function startBotMatch() {
   state.localSlot = "human";
 
   const matchSeed = generateMatchSeed();
+  const firstMatchScripted = (Number(state.progression.matchesCompleted) || 0) === 0;
   const gameEventId = pickRandomGameEventId();
   const starterRng = createSeededRng(`${matchSeed}:starter`);
   const draftRoles = buildDeterministicDraftRoles(matchSeed);
@@ -2494,9 +2614,10 @@ function startBotMatch() {
   }, gameEventId);
   const payload = {
     stage: "match-start",
+    firstMatchScripted,
     matchSeed,
     gameEventId,
-    startingActor: starterRng() < 0.5 ? "human" : "bot",
+    startingActor: firstMatchScripted ? "human" : starterRng() < 0.5 ? "human" : "bot",
     players: {
       human: {
         id: state.slots.human.id,
@@ -2881,17 +3002,26 @@ function applyDraftFinalStart(payload) {
     startingActor: payload.startingActor,
     matchSeed: payload.matchSeed,
     gameEventId: payload.gameEventId,
+    firstMatchScripted: Boolean(payload.firstMatchScripted),
     loadout: {
       human: payload.players.human,
       bot: payload.players.bot
     }
   });
 
+  if (isFirstScriptedBotMatchActive()) {
+    ensureFirstMatchBotKnightBluff();
+  }
+
   state.phase = PHASES.gameStart;
   state.screen = APP_SCREENS.game;
   setCurrentAction("Match start.");
   updateUI();
-  openMatchOnboarding();
+  if (isFirstScriptedBotMatchActive()) {
+    openFirstMatchIntroGuide();
+  } else {
+    openMatchOnboarding();
+  }
 }
 
 async function finalizeDraftIfReady() {
@@ -3208,6 +3338,17 @@ function buildSyncSnapshot() {
         bot: Boolean(state.matchOnboarding && state.matchOnboarding.readyBySlot && state.matchOnboarding.readyBySlot.bot)
       }
     },
+    firstMatchGuide: {
+      scripted: Boolean(state.firstMatchGuide && state.firstMatchGuide.scripted),
+      active: Boolean(state.firstMatchGuide && state.firstMatchGuide.active),
+      overlayMode: state.firstMatchGuide ? state.firstMatchGuide.overlayMode || null : null,
+      stepIndex: Number(state.firstMatchGuide && state.firstMatchGuide.stepIndex) || 0,
+      awaitingFinalOverlay: Boolean(state.firstMatchGuide && state.firstMatchGuide.awaitingFinalOverlay),
+      botFirstPlayDone: Boolean(state.firstMatchGuide && state.firstMatchGuide.botFirstPlayDone),
+      botAcceptedFirstHumanCard: Boolean(state.firstMatchGuide && state.firstMatchGuide.botAcceptedFirstHumanCard),
+      decisionOverlayShown: Boolean(state.firstMatchGuide && state.firstMatchGuide.decisionOverlayShown),
+      finalOverlayShown: Boolean(state.firstMatchGuide && state.firstMatchGuide.finalOverlayShown)
+    },
     round: state.round,
     roundActionCounter: state.roundActionCounter,
     roundStarter: state.roundStarter,
@@ -3297,6 +3438,19 @@ function applySyncPayload(payload) {
         }
       }
     : createMatchOnboardingState();
+  state.firstMatchGuide = snap.firstMatchGuide
+    ? {
+        scripted: Boolean(snap.firstMatchGuide.scripted),
+        active: Boolean(snap.firstMatchGuide.active),
+        overlayMode: snap.firstMatchGuide.overlayMode || null,
+        stepIndex: clamp(Number(snap.firstMatchGuide.stepIndex) || 0, 0, FIRST_MATCH_GUIDE_STEPS.length - 1),
+        awaitingFinalOverlay: Boolean(snap.firstMatchGuide.awaitingFinalOverlay),
+        botFirstPlayDone: Boolean(snap.firstMatchGuide.botFirstPlayDone),
+        botAcceptedFirstHumanCard: Boolean(snap.firstMatchGuide.botAcceptedFirstHumanCard),
+        decisionOverlayShown: Boolean(snap.firstMatchGuide.decisionOverlayShown),
+        finalOverlayShown: Boolean(snap.firstMatchGuide.finalOverlayShown)
+      }
+    : createFirstMatchGuideState();
   state.round = Number(snap.round) || 1;
   state.roundActionCounter = Number(snap.roundActionCounter) || 0;
   state.roundStarter = snap.roundStarter || null;
@@ -3495,7 +3649,8 @@ function beginTurn() {
 
   if (state.mode === "bot") {
     if (actor === "human") {
-      runHumanTimer("action", MATCH_SETTINGS.HUMAN_TIMER_SECONDS, () => handleActionTimeout(actor));
+      if (isFirstScriptedBotMatchActive()) clearTimer();
+      else runHumanTimer("action", MATCH_SETTINGS.HUMAN_TIMER_SECONDS, () => handleActionTimeout(actor));
     } else {
       clearTimer();
       void botTakeTurn();
@@ -3633,6 +3788,12 @@ function applyActionResourceCost(action) {
 
 function finalizeResolvedAction() {
   if (concludeMatchByHp()) return;
+  if (isFirstScriptedBotMatchActive() && state.firstMatchGuide.awaitingFinalOverlay && !state.firstMatchGuide.finalOverlayShown) {
+    state.firstMatchGuide.awaitingFinalOverlay = false;
+    openFirstMatchFinalGuide();
+    updateUI();
+    return;
+  }
   advanceToNextAction();
 }
 
@@ -3690,7 +3851,8 @@ function promptResponseForOpponent() {
 
   if (state.mode === "bot") {
     if (responder === "human") {
-      runHumanTimer("response", MATCH_SETTINGS.HUMAN_TIMER_SECONDS, () => handleResponseTimeout(responder));
+      if (isFirstScriptedBotMatchActive()) clearTimer();
+      else runHumanTimer("response", MATCH_SETTINGS.HUMAN_TIMER_SECONDS, () => handleResponseTimeout(responder));
     } else {
       clearTimer();
       void botRespondToClaim();
@@ -3701,6 +3863,16 @@ function promptResponseForOpponent() {
     } else {
       clearTimer();
     }
+  }
+
+  if (
+    isFirstScriptedBotMatchActive() &&
+    responder === "human" &&
+    action.actor === "bot" &&
+    action.kind === "role" &&
+    !state.firstMatchGuide.decisionOverlayShown
+  ) {
+    openFirstMatchDecisionGuide();
   }
 
   updateUI();
@@ -3765,6 +3937,9 @@ function resolveAccept() {
 
   if (typeof action.cardIndex === "number") markRoleReveal(action.actor, action.cardIndex);
   setCurrentAction(formatDecisionText(state.pendingResponder || opponentOf(action.actor), "ACCEPT"));
+  if (isFirstScriptedBotMatchActive() && action.actor === "bot" && (state.pendingResponder || opponentOf(action.actor)) === "human") {
+    state.firstMatchGuide.awaitingFinalOverlay = true;
+  }
 
   runResolutionAfterDelay(() => {
     const pending = state.pendingAction;
@@ -3792,6 +3967,9 @@ function resolveChallenge() {
   state.pendingChallengeResult = { actor, challenger, role: action.role, isReal };
 
   setCurrentAction(formatChallengeOutcome(isReal, actor, challenger));
+  if (isFirstScriptedBotMatchActive() && actor === "bot" && challenger === "human") {
+    state.firstMatchGuide.awaitingFinalOverlay = true;
+  }
 
   runResolutionAfterDelay(() => {
     const pending = state.pendingAction;
@@ -3855,7 +4033,7 @@ function applyEffect(action) {
       if (revealIndex !== null) {
         const revealed = revealCardVerification(target, revealIndex, "SCIENTIST");
         if (revealed) {
-          const status = revealed.isReal ? "REAL" : "FAKE";
+          const status = revealed.isReal ? "REAL" : "BLUFF";
           setCurrentAction(`Reveal ${status} ${getRoleDisplayName(revealed.role)}`);
         }
       }
@@ -4103,6 +4281,21 @@ function botChooseAction() {
   const legal = gatherLegalActions("bot");
   if (legal.length === 0) return "INTEREST";
 
+  if (isFirstScriptedBotMatchActive() && !state.firstMatchGuide.botFirstPlayDone) {
+    const scriptedBotCards = Array.isArray(state.players.bot.cards) ? state.players.bot.cards : [];
+    const fixedCardIndex = scriptedBotCards.findIndex((card) => card && card.role === "KNIGHT" && card.isReal === false);
+    if (fixedCardIndex >= 0) {
+      const fixedCard = scriptedBotCards[fixedCardIndex];
+      const fixedCost = getRoleCost("KNIGHT", fixedCard);
+      if (state.players.bot.gold < fixedCost) {
+        applyGold("bot", fixedCost - state.players.bot.gold, "First match scripted setup");
+      }
+      state.firstMatchGuide.botFirstPlayDone = true;
+      return { kind: "card", cardIndex: fixedCardIndex };
+    }
+    state.firstMatchGuide.botFirstPlayDone = true;
+  }
+
   const human = state.players.human;
   const bot = state.players.bot;
 
@@ -4120,6 +4313,14 @@ function botChooseAction() {
   }
 
   const scored = legal.map((action) => ({ action, score: scoreBotAction(action) })).sort((a, b) => b.score - a.score);
+
+  if (isFirstScriptedBotMatchActive()) {
+    const interest = legal.find((action) => action.kind === "basic" && action.id === "INTEREST");
+    if (interest && Math.random() < 0.82) return "INTEREST";
+    const weakest = scored[scored.length - 1] ? scored[scored.length - 1].action : legal[0];
+    if (weakest) return weakest.kind === "basic" ? weakest.id : { kind: "card", cardIndex: weakest.cardIndex };
+  }
+
   const bluffRate = getBotBluffRate();
   const best = scored[0];
   const fakeCandidates = scored.filter((item) => item.action.kind === "role" && item.action.isReal === false);
@@ -4135,6 +4336,7 @@ function botChooseAction() {
 
 function botShouldChallenge(action) {
   if (!action || action.kind !== "role") return false;
+  if (isFirstScriptedBotMatchActive()) return Math.random() < 0.08;
   const role = action.role;
   const suspicion = state.ai.suspicion[role] ?? 0.35;
   const bot = state.players.bot;
@@ -4225,6 +4427,18 @@ async function botRespondToClaim() {
     return;
   }
 
+  if (
+    isFirstScriptedBotMatchActive() &&
+    state.pendingAction &&
+    state.pendingAction.actor === "human" &&
+    state.pendingAction.kind === "role" &&
+    !state.firstMatchGuide.botAcceptedFirstHumanCard
+  ) {
+    state.firstMatchGuide.botAcceptedFirstHumanCard = true;
+    resolveAccept();
+    return;
+  }
+
   if (botShouldChallenge(state.pendingAction)) resolveChallenge();
   else resolveAccept();
 }
@@ -4279,6 +4493,7 @@ function applyCanonicalTimeout(payload) {
 function submitLocalAction(input) {
   const invalidFeedback = getInvalidActionFeedback(input);
   if (invalidFeedback) {
+    triggerInvalidTapHint();
     showActionToast(invalidFeedback);
     return;
   }
@@ -4632,7 +4847,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     const verifiedTag = document.createElement("span");
     const verifiedIsReal = card.verification === "REAL";
     verifiedTag.className = `card-badge card-status-tag ${verifiedIsReal ? "card-real-tag" : "card-fake-tag"}`;
-    verifiedTag.textContent = verifiedIsReal ? "REAL" : "FAKE";
+    verifiedTag.textContent = verifiedIsReal ? "REAL" : "BLUFF";
     badgeLeft.appendChild(verifiedTag);
     hasBadge = true;
   }
@@ -4840,6 +5055,23 @@ function renderLeagueProgressTrack() {
   ui.leagueProgressTrack.innerHTML = "";
   const fragment = document.createDocumentFragment();
 
+  const soonNode = document.createElement("div");
+  soonNode.className = "league-track-soon-node";
+  soonNode.textContent = "New leagues coming soon";
+  fragment.appendChild(soonNode);
+
+  const sortedRewards = [...PROGRESSION_REWARDS].sort((a, b) => {
+    const aSegmentIndex = LEAGUE_SEGMENT_INDEX_BY_ID[a.segmentId] ?? 0;
+    const bSegmentIndex = LEAGUE_SEGMENT_INDEX_BY_ID[b.segmentId] ?? 0;
+    if (aSegmentIndex !== bSegmentIndex) return aSegmentIndex - bSegmentIndex;
+    return (Number(a.point) || 0) - (Number(b.point) || 0);
+  });
+  const rewardsBySegment = sortedRewards.reduce((acc, reward) => {
+    if (!acc[reward.segmentId]) acc[reward.segmentId] = [];
+    acc[reward.segmentId].push(reward);
+    return acc;
+  }, Object.create(null));
+
   let alignLeft = true;
   const segmentOrder = [...LEAGUE_SEGMENTS].reverse();
   segmentOrder.forEach((segment) => {
@@ -4848,17 +5080,13 @@ function renderLeagueProgressTrack() {
     section.textContent = `${segment.league} ${segment.subleague}`;
     fragment.appendChild(section);
 
-    const rewards = PROGRESSION_REWARDS.filter((reward) => reward.segmentId === segment.id).sort((a, b) => a.point - b.point);
-    rewards.forEach((reward) => {
+    const rewards = Array.isArray(rewardsBySegment[segment.id]) ? rewardsBySegment[segment.id] : [];
+    for (let i = rewards.length - 1; i >= 0; i -= 1) {
+      const reward = rewards[i];
       fragment.appendChild(createLeagueTrackRewardRow(reward, alignLeft));
       alignLeft = !alignLeft;
-    });
+    }
   });
-
-  const intro = document.createElement("div");
-  intro.className = "league-track-intro";
-  intro.textContent = "START - Adventurer, Knight, Goblin, Siren, Elf, and No Event";
-  fragment.appendChild(intro);
 
   ui.leagueProgressTrack.appendChild(fragment);
 }
@@ -4996,11 +5224,13 @@ function updateUI() {
   const claimableRewards = getClaimableRewards();
   const hasClaimable = claimableRewards.length > 0;
   const hasClaimableHero = hasClaimableHeroRewards();
+  const claimedCount = Object.keys(state.progression.claimedRewardIds || {}).length;
+  const canShowSecondaryDots = claimedCount > 0;
   if (ui.leagueBadgeDot) ui.leagueBadgeDot.classList.toggle("hidden", !hasClaimable);
-  if (ui.collectionBtnDot) ui.collectionBtnDot.classList.toggle("hidden", !hasClaimable);
-  if (ui.avatarPreviewDot) ui.avatarPreviewDot.classList.toggle("hidden", !hasClaimableHero);
+  if (ui.collectionBtnDot) ui.collectionBtnDot.classList.toggle("hidden", !(canShowSecondaryDots && hasClaimable));
+  if (ui.avatarPreviewDot) ui.avatarPreviewDot.classList.toggle("hidden", !(canShowSecondaryDots && hasClaimableHero));
   if (ui.leagueBadgeBtn) ui.leagueBadgeBtn.classList.toggle("has-notice", hasClaimable);
-  if (ui.collectionBtn) ui.collectionBtn.classList.toggle("has-notice", hasClaimable);
+  if (ui.collectionBtn) ui.collectionBtn.classList.toggle("has-notice", canShowSecondaryDots && hasClaimable);
   if (ui.claimAllRewardsBtn) {
     ui.claimAllRewardsBtn.disabled = !hasClaimable;
     ui.claimAllRewardsBtn.textContent = hasClaimable ? `Claim All (${claimableRewards.length})` : "Claim All";
@@ -5266,6 +5496,16 @@ function closeModal(modalNode = modalState.activeModal) {
   if (!(modalNode instanceof HTMLElement)) return;
   modalNode.classList.add("hidden");
   if (modalNode === ui.matchOnboardingModal) stopOnboardingTypewriter();
+  if (modalNode === ui.firstMatchGuideModal) {
+    if (ui.appRoot) ui.appRoot.classList.remove("first-guide-active");
+    clearGuideSpotlights();
+    if (uiRuntime.guidePulseTimerId) {
+      clearTimeout(uiRuntime.guidePulseTimerId);
+      uiRuntime.guidePulseTimerId = null;
+    }
+    if (ui.acceptBtn) ui.acceptBtn.classList.remove("first-guide-pulse");
+    if (ui.challengeBtn) ui.challengeBtn.classList.remove("first-guide-pulse");
+  }
   if (modalState.activeModal === modalNode) modalState.activeModal = null;
 }
 
@@ -5500,6 +5740,149 @@ function openMatchOnboarding() {
   void submitLocalMatchOnboardingReady();
 }
 
+function clearGuideSpotlights() {
+  document.querySelectorAll(".guide-spotlight").forEach((node) => node.classList.remove("guide-spotlight"));
+}
+
+function applyGuideSpotlights(selectors = []) {
+  clearGuideSpotlights();
+  selectors.forEach((selector) => {
+    if (!selector) return;
+    document.querySelectorAll(selector).forEach((node) => node.classList.add("guide-spotlight"));
+  });
+}
+
+function renderFirstMatchGuideOverlay() {
+  if (!ui.firstMatchGuideModal || !ui.firstMatchGuideTitle || !ui.firstMatchGuideBody || !ui.firstMatchGuideNextBtn) return;
+  const guide = state.firstMatchGuide || createFirstMatchGuideState();
+  if (guide.overlayMode === "decision") {
+    ui.firstMatchGuideTitle.textContent = FIRST_MATCH_DECISION_OVERLAY.title;
+    ui.firstMatchGuideBody.textContent = FIRST_MATCH_DECISION_OVERLAY.body;
+    ui.firstMatchGuideNextBtn.textContent = FIRST_MATCH_DECISION_OVERLAY.button;
+    applyGuideSpotlights(["#acceptBtn", "#challengeBtn"]);
+    return;
+  }
+  if (guide.overlayMode === "final") {
+    ui.firstMatchGuideTitle.textContent = FIRST_MATCH_FINAL_OVERLAY.title;
+    ui.firstMatchGuideBody.textContent = FIRST_MATCH_FINAL_OVERLAY.body;
+    ui.firstMatchGuideNextBtn.textContent = FIRST_MATCH_FINAL_OVERLAY.button;
+    applyGuideSpotlights([]);
+    return;
+  }
+  const step = FIRST_MATCH_GUIDE_STEPS[clamp(Number(guide.stepIndex) || 0, 0, FIRST_MATCH_GUIDE_STEPS.length - 1)];
+  ui.firstMatchGuideTitle.textContent = step.title;
+  ui.firstMatchGuideBody.textContent = step.body;
+  ui.firstMatchGuideNextBtn.textContent = step.button;
+  applyGuideSpotlights(step.spotlightSelectors || []);
+}
+
+function openFirstMatchGuideOverlay(mode) {
+  if (!isFirstScriptedBotMatchActive()) return;
+  if (!(ui.firstMatchGuideModal instanceof HTMLElement)) return;
+  state.firstMatchGuide.active = true;
+  state.firstMatchGuide.overlayMode = mode;
+  if (ui.appRoot) ui.appRoot.classList.add("first-guide-active");
+  openModal(ui.firstMatchGuideModal);
+  renderFirstMatchGuideOverlay();
+}
+
+function openFirstMatchIntroGuide() {
+  if (!isFirstScriptedBotMatchActive()) {
+    openMatchOnboarding();
+    return;
+  }
+  state.firstMatchGuide.stepIndex = 0;
+  openFirstMatchGuideOverlay("intro");
+}
+
+function pulseFirstMatchDecisionButtons() {
+  if (!ui.acceptBtn || !ui.challengeBtn) return;
+  ui.acceptBtn.classList.remove("first-guide-pulse");
+  ui.challengeBtn.classList.remove("first-guide-pulse");
+  void ui.acceptBtn.offsetWidth;
+  ui.acceptBtn.classList.add("first-guide-pulse");
+  if (uiRuntime.guidePulseTimerId) clearTimeout(uiRuntime.guidePulseTimerId);
+  uiRuntime.guidePulseTimerId = setTimeout(() => {
+    ui.acceptBtn.classList.add("first-guide-pulse");
+    ui.challengeBtn.classList.add("first-guide-pulse");
+    uiRuntime.guidePulseTimerId = setTimeout(() => {
+      ui.acceptBtn.classList.remove("first-guide-pulse");
+      ui.challengeBtn.classList.remove("first-guide-pulse");
+      uiRuntime.guidePulseTimerId = null;
+    }, 520);
+  }, 280);
+}
+
+function openFirstMatchDecisionGuide() {
+  if (!isFirstScriptedBotMatchActive()) return;
+  if (state.firstMatchGuide.decisionOverlayShown) return;
+  state.firstMatchGuide.decisionOverlayShown = true;
+  openFirstMatchGuideOverlay("decision");
+}
+
+function openFirstMatchFinalGuide() {
+  if (!isFirstScriptedBotMatchActive()) return;
+  if (state.firstMatchGuide.finalOverlayShown) return;
+  state.firstMatchGuide.finalOverlayShown = true;
+  openFirstMatchGuideOverlay("final");
+}
+
+function ensureFirstMatchBotKnightBluff() {
+  if (!isFirstScriptedBotMatchActive()) return;
+  const cards = state.players.bot && Array.isArray(state.players.bot.cards) ? state.players.bot.cards : [];
+  if (cards.length === 0) return;
+  const existing = cards.find((card) => card && !card.isReal && card.role === "KNIGHT");
+  if (existing) return;
+
+  let target = cards.find((card) => card && !card.isReal);
+  if (!target) target = cards[0] || null;
+  if (!target) return;
+
+  target.role = "KNIGHT";
+  target.isReal = false;
+  target.revealedUsed = false;
+  target.confirmed = false;
+  target.verification = null;
+  applyCardRoleDefaults(target, target.role);
+  syncPlayerRoleLists("bot");
+}
+
+function advanceFirstMatchGuideOverlay() {
+  if (!isFirstScriptedBotMatchActive()) return;
+  if (!state.firstMatchGuide.active) return;
+  const mode = state.firstMatchGuide.overlayMode || "intro";
+
+  if (mode === "decision") {
+    state.firstMatchGuide.active = false;
+    closeModal(ui.firstMatchGuideModal);
+    clearGuideSpotlights();
+    pulseFirstMatchDecisionButtons();
+    updateUI();
+    return;
+  }
+
+  if (mode === "final") {
+    state.firstMatchGuide.active = false;
+    closeModal(ui.firstMatchGuideModal);
+    clearGuideSpotlights();
+    updateUI();
+    advanceToNextAction();
+    return;
+  }
+
+  if (state.firstMatchGuide.stepIndex < FIRST_MATCH_GUIDE_STEPS.length - 1) {
+    state.firstMatchGuide.stepIndex += 1;
+    renderFirstMatchGuideOverlay();
+    return;
+  }
+
+  state.firstMatchGuide.active = false;
+  closeModal(ui.firstMatchGuideModal);
+  clearGuideSpotlights();
+  updateUI();
+  openMatchOnboarding();
+}
+
 function setTutorialCardStatusTag(node, isReal) {
   const refs = ensureCardBadgeRow(node);
   if (!refs) return;
@@ -5508,7 +5891,7 @@ function setTutorialCardStatusTag(node, isReal) {
 
   const statusTag = document.createElement("span");
   statusTag.className = `card-badge card-status-tag ${isReal ? "card-real-tag" : "card-tutorial-fake-tag"}`;
-  statusTag.textContent = isReal ? "REAL" : "FAKE";
+  statusTag.textContent = isReal ? "REAL" : "BLUFF";
   badgeLeft.prepend(statusTag);
 }
 
@@ -5850,6 +6233,11 @@ function bindEvents() {
       void advanceMatchOnboardingStep();
     });
   }
+  if (ui.firstMatchGuideNextBtn) {
+    ui.firstMatchGuideNextBtn.addEventListener("click", () => {
+      advanceFirstMatchGuideOverlay();
+    });
+  }
   ui.collectionCloseBtn.addEventListener("click", () => closeModal(ui.collectionModal));
   ui.leagueProgressCloseBtn.addEventListener("click", () => closeModal(ui.leagueProgressModal));
   ui.collectionBtn.addEventListener("click", () => {
@@ -5966,6 +6354,7 @@ function bindEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     if (modalState.activeModal === ui.matchOnboardingModal) return;
+    if (modalState.activeModal === ui.firstMatchGuideModal) return;
     if (state.gameEventTooltip.open) {
       closeGameEventTooltip();
       return;
@@ -5995,6 +6384,14 @@ function bindEvents() {
     if (target.closest(".hero-tooltip-card")) return;
     if (target.closest("#topAvatar") || target.closest("#bottomAvatar")) return;
     closeHeroTooltip();
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!canTriggerInvalidTapHint()) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (isValidActionTapTarget(target)) return;
+    triggerInvalidTapHint();
   });
 
   applyCanonicalFromLocalStartIfNeeded();
@@ -6105,6 +6502,10 @@ function cacheElements() {
   ui.matchOnboardingBody = document.getElementById("matchOnboardingBody");
   ui.matchOnboardingCards = document.getElementById("matchOnboardingCards");
   ui.matchOnboardingNextBtn = document.getElementById("matchOnboardingNextBtn");
+  ui.firstMatchGuideModal = document.getElementById("firstMatchGuideModal");
+  ui.firstMatchGuideTitle = document.getElementById("firstMatchGuideTitle");
+  ui.firstMatchGuideBody = document.getElementById("firstMatchGuideBody");
+  ui.firstMatchGuideNextBtn = document.getElementById("firstMatchGuideNextBtn");
 
   ui.resultWinnerText = document.getElementById("resultWinnerText");
   ui.resultSummaryText = document.getElementById("resultSummaryText");
