@@ -20,7 +20,8 @@ const APP_SCREENS = Object.freeze({
   friend: "friend",
   waiting: "waiting",
   game: "game",
-  result: "result"
+  result: "result",
+  review: "review"
 });
 
 const EVENT_TYPES = Object.freeze(["HELLO", "START", "ACTION", "RESPONSE", "TIMEOUT_FORCED", "SYNC"]);
@@ -545,6 +546,8 @@ const state = {
   matchOnboarding: createMatchOnboardingState(),
   firstMatchGuide: createFirstMatchGuideState(),
   tutorialMatch: false,
+  review: createMatchReviewState(),
+  postGameReview: createPostGameReviewState(),
   heroTooltip: { slot: null, open: false },
   gameEventId: "none",
   gameEventTooltip: { open: false },
@@ -1132,6 +1135,23 @@ function createFirstMatchGuideState() {
     niceOverlayShown: false,
     decisionOverlayShown: false,
     finalOverlayShown: false
+  };
+}
+
+function createMatchReviewState() {
+  return {
+    actionCounter: 0,
+    actions: []
+  };
+}
+
+function createPostGameReviewState() {
+  return {
+    bluffSuccessRate: 0,
+    challengeAccuracy: 0,
+    optimalDecisions: 0,
+    feedback: "",
+    highlights: []
   };
 }
 
@@ -2613,6 +2633,8 @@ function resetMatchState(options = {}) {
   state.firstMatchGuide = createFirstMatchGuideState();
   state.firstMatchGuide.scripted = Boolean(options.firstMatchScripted && state.mode === "bot");
   state.tutorialMatch = Boolean(options.tutorialMatch && state.mode === "bot");
+  state.review = createMatchReviewState();
+  state.postGameReview = createPostGameReviewState();
   state.heroTooltip = { slot: null, open: false };
   state.gameEventTooltip = { open: false };
   state.round = 1;
@@ -2666,6 +2688,8 @@ async function backToMenu() {
   state.draft = createDraftState();
   state.matchSeed = "";
   state.tutorialMatch = false;
+  state.review = createMatchReviewState();
+  state.postGameReview = createPostGameReviewState();
   state.friend.pendingRequest = null;
   state.friend.startInFlight = false;
 
@@ -3673,6 +3697,7 @@ function concludeMatch(winnerKey, reason) {
   if (!isTutorialMatchActive()) {
     applyProgressAfterCompletedMatch(winnerKey);
   }
+  state.postGameReview = buildPostGameReviewData(winnerKey);
   state.phase = PHASES.matchEnd;
   state.screen = APP_SCREENS.result;
   state.matchWinner = winnerKey;
@@ -3852,6 +3877,7 @@ function normalizeActionInput(actor, input) {
       label: id,
       role: null,
       cardIndex: null,
+      isReal: null,
       cost: basic.cost,
       challengeable: basic.challengeable,
       description: basic.description
@@ -3884,6 +3910,7 @@ function normalizeActionInput(actor, input) {
     label: getRoleDisplayName(card.role),
     role: card.role,
     cardIndex,
+    isReal: Boolean(card.isReal),
     cost: dynamicCost,
     challengeable: true,
     description: getRoleEffectSummary(card.role, card)
@@ -3899,6 +3926,319 @@ function isActionLegal(actor, action) {
 
 function formatActionText(actor, action) {
   return `${slotName(actor)} played ${action.label}`;
+}
+
+function toPercent(numerator, denominator, fallback = 50) {
+  if (denominator <= 0) return clamp(Math.round(Number(fallback) || 0), 0, 100);
+  return clamp(Math.round((numerator / denominator) * 100), 0, 100);
+}
+
+function getReviewEntryById(entryId) {
+  if (!entryId || !state.review || !Array.isArray(state.review.actions)) return null;
+  return state.review.actions.find((entry) => entry && entry.id === entryId) || null;
+}
+
+function recordPendingActionForReview(action) {
+  if (!action) return null;
+  if (!state.review || !Array.isArray(state.review.actions)) state.review = createMatchReviewState();
+  const turnNumber = Math.max(1, (Number(state.review.actionCounter) || 0) + 1);
+  state.review.actionCounter = turnNumber;
+
+  const actor = action.actor;
+  const target = action.target;
+  const actorState = state.players[actor] || createPlayerState(actor);
+  const targetState = state.players[target] || createPlayerState(target);
+
+  const entry = {
+    id: `review-${turnNumber}-${state.round}-${state.roundActionCounter}`,
+    turnNumber,
+    round: state.round,
+    actor,
+    target,
+    kind: action.kind,
+    actionId: action.id,
+    actionLabel: action.label,
+    role: action.role || null,
+    isRole: action.kind === "role",
+    isBluff: action.kind === "role" ? !Boolean(action.isReal) : false,
+    isReal: action.kind === "role" ? Boolean(action.isReal) : null,
+    actorHpBefore: Number(actorState.hp) || 0,
+    actorGoldBefore: Number(actorState.gold) || 0,
+    targetHpBefore: Number(targetState.hp) || 0,
+    targetGoldBefore: Number(targetState.gold) || 0,
+    actorHpAfter: Number(actorState.hp) || 0,
+    actorGoldAfter: Number(actorState.gold) || 0,
+    targetHpAfter: Number(targetState.hp) || 0,
+    targetGoldAfter: Number(targetState.gold) || 0,
+    response: null,
+    responder: null,
+    challengeWasCorrect: false,
+    challengeWasWrong: false,
+    hpSwingForActor: 0,
+    goldSwingForActor: 0
+  };
+  state.review.actions.push(entry);
+  return entry.id;
+}
+
+function markReviewDecision(entryId, response, options = {}) {
+  const entry = getReviewEntryById(entryId);
+  if (!entry) return;
+  entry.response = response;
+  entry.responder = state.pendingResponder || opponentOf(entry.actor);
+  if (response !== "CHALLENGE") return;
+  const isReal = Boolean(options.isReal);
+  entry.challengeWasCorrect = !isReal;
+  entry.challengeWasWrong = isReal;
+}
+
+function finalizeReviewEntry(entryId) {
+  const entry = getReviewEntryById(entryId);
+  if (!entry) return;
+  const actorState = state.players[entry.actor] || createPlayerState(entry.actor);
+  const targetState = state.players[entry.target] || createPlayerState(entry.target);
+  entry.actorHpAfter = Number(actorState.hp) || 0;
+  entry.actorGoldAfter = Number(actorState.gold) || 0;
+  entry.targetHpAfter = Number(targetState.hp) || 0;
+  entry.targetGoldAfter = Number(targetState.gold) || 0;
+  const actorDamageTaken = Math.max(0, entry.actorHpBefore - entry.actorHpAfter);
+  const targetDamageDealt = Math.max(0, entry.targetHpBefore - entry.targetHpAfter);
+  entry.hpSwingForActor = targetDamageDealt - actorDamageTaken;
+  const actorGoldGain = entry.actorGoldAfter - entry.actorGoldBefore;
+  const targetGoldGain = entry.targetGoldAfter - entry.targetGoldBefore;
+  entry.goldSwingForActor = actorGoldGain - targetGoldGain;
+}
+
+function createReviewHighlightFromEntry(entry, label, actionText, resultText, priority = 0) {
+  return {
+    turnNumber: Math.max(1, Number(entry?.turnNumber) || 1),
+    label: String(label || "Great Read"),
+    actionText: String(actionText || "You made a smart move."),
+    resultText: String(resultText || "Result: Good pressure applied."),
+    priority: Number(priority) || 0
+  };
+}
+
+function buildPostGameReviewData(winnerKey = state.matchWinner) {
+  const local = state.localSlot || "human";
+  const entries = Array.isArray(state.review && state.review.actions) ? state.review.actions : [];
+  const localActed = entries.filter((entry) => entry && entry.actor === local);
+  const localResponded = entries.filter((entry) => entry && entry.responder === local && entry.response);
+
+  const localBluffs = localActed.filter((entry) => entry.isRole && entry.isBluff);
+  const successfulBluffs = localBluffs.filter(
+    (entry) => entry.response === "ACCEPT" || (entry.response === "CHALLENGE" && entry.challengeWasWrong)
+  );
+  const bluffSuccessRate = toPercent(successfulBluffs.length, localBluffs.length, 58);
+
+  const localChallenges = localResponded.filter((entry) => entry.response === "CHALLENGE");
+  const correctChallenges = localChallenges.filter((entry) => entry.challengeWasCorrect);
+  const challengeAccuracy = toPercent(correctChallenges.length, localChallenges.length, 60);
+
+  let optimalTotal = 0;
+  let optimalHits = 0;
+  localActed.forEach((entry) => {
+    if (!entry) return;
+    optimalTotal += 1;
+    if (entry.isRole && entry.isBluff) {
+      if (entry.response === "ACCEPT" || (entry.response === "CHALLENGE" && entry.challengeWasWrong)) optimalHits += 1;
+      return;
+    }
+    if (entry.hpSwingForActor >= 0 || entry.goldSwingForActor > 0) optimalHits += 1;
+  });
+  localResponded.forEach((entry) => {
+    if (!entry) return;
+    optimalTotal += 1;
+    if (entry.response === "CHALLENGE" && entry.challengeWasCorrect) optimalHits += 1;
+    if (entry.response === "ACCEPT" && entry.isReal === true) optimalHits += 1;
+  });
+  const optimalDecisions = toPercent(optimalHits, optimalTotal, 71);
+
+  const candidates = [];
+  entries.forEach((entry) => {
+    if (!entry) return;
+    if (entry.actor === local && entry.isRole && entry.isBluff && entry.response === "CHALLENGE" && entry.challengeWasWrong) {
+      candidates.push(
+        createReviewHighlightFromEntry(
+          entry,
+          "Brilliant Bluff",
+          `You played ${entry.actionLabel} as a BLUFF.`,
+          "Result: Opponent challenged and lost 2 HP.",
+          100
+        )
+      );
+    }
+    if (entry.responder === local && entry.response === "CHALLENGE" && entry.challengeWasCorrect) {
+      candidates.push(
+        createReviewHighlightFromEntry(
+          entry,
+          "Great Read",
+          `You challenged opponent's ${entry.actionLabel}.`,
+          "Result: Correct challenge. Opponent lost 2 HP.",
+          95
+        )
+      );
+    }
+    if (entry.actor === local && entry.hpSwingForActor >= 2) {
+      candidates.push(
+        createReviewHighlightFromEntry(
+          entry,
+          "Clever Trap",
+          `You used ${entry.actionLabel} to swing the position.`,
+          `Result: Strong HP swing in your favor (${entry.hpSwingForActor}).`,
+          82
+        )
+      );
+    }
+    if (entry.actor === local && entry.isRole && entry.isBluff && entry.actorHpBefore <= 2) {
+      candidates.push(
+        createReviewHighlightFromEntry(
+          entry,
+          "Risky Play",
+          `You bluffed with ${entry.actionLabel} at low HP.`,
+          "Result: High-risk pressure play under stress.",
+          76
+        )
+      );
+    }
+    if (
+      entry.actor === local &&
+      entry.isRole &&
+      ["ENT", "DWARF", "ANGEL", "VALK"].includes(String(entry.role || "").toUpperCase()) &&
+      entry.actorHpBefore <= 2
+    ) {
+      candidates.push(
+        createReviewHighlightFromEntry(
+          entry,
+          "Perfect Timing",
+          `You played ${entry.actionLabel} when HP was critical.`,
+          "Result: Defensive timing kept you in the match.",
+          88
+        )
+      );
+    }
+  });
+
+  const uniqueByTurnAndLabel = new Set();
+  const deduped = candidates
+    .sort((a, b) => b.priority - a.priority || a.turnNumber - b.turnNumber)
+    .filter((item) => {
+      const key = `${item.turnNumber}:${item.label}`;
+      if (uniqueByTurnAndLabel.has(key)) return false;
+      uniqueByTurnAndLabel.add(key);
+      return true;
+    });
+
+  const highlights = deduped.slice(0, 4);
+  const fillerPool = localActed.length > 0 ? localActed : entries;
+  let fillerIndex = 0;
+  let fillerAttempts = 0;
+  const fillerLabels = ["Perfect Timing", "Clever Trap", "Risky Play", "Great Read"];
+  while (highlights.length < 3 && fillerPool.length > 0 && fillerAttempts < 16) {
+    const entry = fillerPool[fillerIndex % fillerPool.length];
+    fillerIndex += 1;
+    fillerAttempts += 1;
+    if (!entry) continue;
+    const fallback = createReviewHighlightFromEntry(
+      entry,
+      fillerLabels[(fillerAttempts - 1) % fillerLabels.length],
+      `${entry.actor === local ? "You" : "Opponent"} played ${entry.actionLabel}.`,
+      "Result: Solid pressure and momentum control.",
+      40
+    );
+    const exists = highlights.some((item) => item.turnNumber === fallback.turnNumber && item.label === fallback.label);
+    if (!exists) highlights.push(fallback);
+  }
+  if (highlights.length === 0) {
+    highlights.push(
+      createReviewHighlightFromEntry(
+        { turnNumber: 1 },
+        "Clever Trap",
+        "You adapted your strategy as the game evolved.",
+        "Result: Good learning momentum for the next match.",
+        10
+      )
+    );
+  }
+  while (highlights.length < 3) {
+    highlights.push(
+      createReviewHighlightFromEntry(
+        { turnNumber: highlights.length + 1 },
+        "Clever Trap",
+        "You kept adapting to the board state.",
+        "Result: Strong learning value for the next match.",
+        8
+      )
+    );
+  }
+
+  let feedback = "You played a clever psychological game.";
+  const localWon = winnerKey === local;
+  if (!localWon && correctChallenges.length > 0) {
+    feedback = "You lost the match, but made several strong reads.";
+  } else if (challengeAccuracy >= 68) {
+    feedback = "Strong reads on your opponent!";
+  } else if (bluffSuccessRate >= 66) {
+    feedback = "You played a clever psychological game.";
+  } else if (!localWon) {
+    feedback = "Tough result, but you made smart decisions under pressure.";
+  }
+
+  return {
+    bluffSuccessRate,
+    challengeAccuracy,
+    optimalDecisions,
+    feedback,
+    highlights: highlights.slice(0, 4)
+  };
+}
+
+function ensurePostGameReviewReady() {
+  if (!state.postGameReview || !Array.isArray(state.postGameReview.highlights) || state.postGameReview.highlights.length === 0) {
+    state.postGameReview = buildPostGameReviewData(state.matchWinner);
+  }
+}
+
+function renderPostGameReview() {
+  if (!ui.reviewBluffRateText || !ui.reviewChallengeAccuracyText || !ui.reviewOptimalDecisionsText || !ui.reviewFeedbackText || !ui.reviewHighlightsList)
+    return;
+  ensurePostGameReviewReady();
+  const review = state.postGameReview || createPostGameReviewState();
+  ui.reviewBluffRateText.textContent = `${clamp(Number(review.bluffSuccessRate) || 0, 0, 100)}%`;
+  ui.reviewChallengeAccuracyText.textContent = `${clamp(Number(review.challengeAccuracy) || 0, 0, 100)}%`;
+  ui.reviewOptimalDecisionsText.textContent = `${clamp(Number(review.optimalDecisions) || 0, 0, 100)}%`;
+  ui.reviewFeedbackText.textContent = String(review.feedback || "You made smart plays and valuable reads.");
+
+  ui.reviewHighlightsList.innerHTML = "";
+  const fragment = document.createDocumentFragment();
+  const highlights = Array.isArray(review.highlights) ? review.highlights.slice(0, 4) : [];
+  highlights.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "review-moment-card";
+
+    const turn = document.createElement("p");
+    turn.className = "review-moment-turn";
+    turn.textContent = `Turn ${Math.max(1, Number(item.turnNumber) || 1)}`;
+    card.appendChild(turn);
+
+    const badge = document.createElement("span");
+    badge.className = "review-moment-badge";
+    badge.textContent = item.label || "Great Read";
+    card.appendChild(badge);
+
+    const action = document.createElement("p");
+    action.className = "review-moment-line";
+    action.textContent = item.actionText || "You made a smart move.";
+    card.appendChild(action);
+
+    const result = document.createElement("p");
+    result.className = "review-moment-line review-moment-result";
+    result.textContent = item.resultText || "Result: Strong pressure.";
+    card.appendChild(result);
+
+    fragment.appendChild(card);
+  });
+  ui.reviewHighlightsList.appendChild(fragment);
 }
 
 function runResolutionAfterDelay(applyFn) {
@@ -3954,9 +4294,11 @@ function playAction(input) {
     role: action.role,
     label: action.label,
     cardIndex: action.cardIndex,
+    isReal: action.kind === "role" ? Boolean(action.isReal) : null,
     challengeable: action.challengeable,
     cost: action.cost
   };
+  state.pendingAction.reviewEntryId = recordPendingActionForReview(state.pendingAction);
 
   setCurrentAction(formatActionText(actor, action));
 
@@ -3969,6 +4311,7 @@ function playAction(input) {
       if (!pending) return;
       applyActionResourceCost(pending);
       applyEffect(pending);
+      finalizeReviewEntry(pending.reviewEntryId);
       finalizeResolvedAction();
     });
   }
@@ -4072,6 +4415,7 @@ function resolveAccept() {
   if (!action) return;
 
   if (typeof action.cardIndex === "number") markRoleReveal(action.actor, action.cardIndex);
+  markReviewDecision(action.reviewEntryId, "ACCEPT");
   setCurrentAction(formatDecisionText(state.pendingResponder || opponentOf(action.actor), "ACCEPT"));
   if (isFirstScriptedBotMatchActive() && action.actor === "bot" && (state.pendingResponder || opponentOf(action.actor)) === "human") {
     state.firstMatchGuide.awaitingFinalOverlay = true;
@@ -4082,6 +4426,7 @@ function resolveAccept() {
     if (!pending) return;
     applyActionResourceCost(pending);
     applyEffect(pending);
+    finalizeReviewEntry(pending.reviewEntryId);
     finalizeResolvedAction();
   });
 }
@@ -4102,6 +4447,7 @@ function resolveChallenge() {
 
   markRoleReveal(actor, action.cardIndex, isReal ? "REAL" : "FAKE");
   state.pendingChallengeResult = { actor, challenger, role: action.role, isReal };
+  markReviewDecision(action.reviewEntryId, "CHALLENGE", { isReal });
 
   setCurrentAction(formatChallengeOutcome(isReal, actor, challenger));
   if (isFirstScriptedBotMatchActive() && actor === "bot" && challenger === "human") {
@@ -4125,6 +4471,7 @@ function resolveChallenge() {
       if (state.mode === "bot" && result.challenger === "bot") adjustSuspicion(result.role, 0.24);
     }
 
+    finalizeReviewEntry(pending.reviewEntryId);
     finalizeResolvedAction();
   });
 }
@@ -5357,7 +5704,8 @@ function updateUI() {
     [APP_SCREENS.friend]: ui.friendScreen,
     [APP_SCREENS.waiting]: ui.waitingScreen,
     [APP_SCREENS.game]: ui.gameScreen,
-    [APP_SCREENS.result]: ui.resultScreen
+    [APP_SCREENS.result]: ui.resultScreen,
+    [APP_SCREENS.review]: ui.reviewScreen
   };
 
   Object.entries(map).forEach(([key, node]) => {
@@ -5610,6 +5958,7 @@ function updateUI() {
   if (ui.resultOpponentCard) ui.resultOpponentCard.classList.toggle("is-draw", state.matchWinner === "draw");
   renderAvatar(ui.resultLocalAvatar, state.slots[localSlot].heroId);
   renderAvatar(ui.resultOpponentAvatar, state.slots[opponentSlot].heroId);
+  renderPostGameReview();
   syncGameEventTooltip();
   syncHeroTooltip();
 }
@@ -6364,6 +6713,38 @@ function applyCanonicalFromLocalStartIfNeeded() {
   void startFriendMatchAsHost();
 }
 
+function handlePlayAgain() {
+  if (state.mode === "bot") {
+    startBotMatch();
+    return;
+  }
+
+  if (state.mode === "friend") {
+    if (net.connectedCount < 2) {
+      state.screen = APP_SCREENS.waiting;
+      updateUI();
+      return;
+    }
+
+    if (net.role === "host") {
+      void startFriendMatchAsHost();
+    } else {
+      state.screen = APP_SCREENS.waiting;
+      updateUI();
+      void net.sendEvent(
+        "HELLO",
+        {
+          requestRestart: true
+        },
+        {
+          actorId: net.playerId,
+          seq: 0
+        }
+      );
+    }
+  }
+}
+
 function bindEvents() {
   ui.homePlayBtn.addEventListener("click", () => runToModeScreen());
   ui.premiumBtn.addEventListener("click", () => openModal(ui.premiumModal));
@@ -6402,6 +6783,28 @@ function bindEvents() {
   ui.shareResultBtn.addEventListener("click", () => {
     showActionToast("Share coming soon");
   });
+  if (ui.openGameReviewBtn) {
+    ui.openGameReviewBtn.addEventListener("click", () => {
+      ensurePostGameReviewReady();
+      state.screen = APP_SCREENS.review;
+      updateUI();
+    });
+  }
+  if (ui.reviewShareBtn) {
+    ui.reviewShareBtn.addEventListener("click", () => {
+      showActionToast("Sharing coming soon.");
+    });
+  }
+  if (ui.reviewPlayAgainBtn) {
+    ui.reviewPlayAgainBtn.addEventListener("click", () => {
+      handlePlayAgain();
+    });
+  }
+  if (ui.reviewBackToMenuBtn) {
+    ui.reviewBackToMenuBtn.addEventListener("click", () => {
+      void backToMenu();
+    });
+  }
 
   ui.playBotBtn.addEventListener("click", () => startBotMatch());
   ui.playFriendBtn.addEventListener("click", () => {
@@ -6447,35 +6850,7 @@ function bindEvents() {
   });
 
   ui.playAgainBtn.addEventListener("click", () => {
-    if (state.mode === "bot") {
-      startBotMatch();
-      return;
-    }
-
-    if (state.mode === "friend") {
-      if (net.connectedCount < 2) {
-        state.screen = APP_SCREENS.waiting;
-        updateUI();
-        return;
-      }
-
-      if (net.role === "host") {
-        void startFriendMatchAsHost();
-      } else {
-        state.screen = APP_SCREENS.waiting;
-        updateUI();
-        void net.sendEvent(
-          "HELLO",
-          {
-            requestRestart: true
-          },
-          {
-            actorId: net.playerId,
-            seq: 0
-          }
-        );
-      }
-    }
+    handlePlayAgain();
   });
 
   ui.rulesBtn.addEventListener("click", () => openModal(ui.rulesModal));
@@ -6684,6 +7059,7 @@ function cacheElements() {
   ui.waitingScreen = document.getElementById("waitingScreen");
   ui.gameScreen = document.getElementById("gameScreen");
   ui.resultScreen = document.getElementById("resultScreen");
+  ui.reviewScreen = document.getElementById("reviewScreen");
 
   ui.homePlayBtn = document.getElementById("homePlayBtn");
   ui.premiumBtn = document.getElementById("premiumBtn");
@@ -6808,6 +7184,15 @@ function cacheElements() {
   ui.shareResultBtn = document.getElementById("shareResultBtn");
   ui.playAgainBtn = document.getElementById("playAgainBtn");
   ui.backToMenuBtn = document.getElementById("backToMenuBtn");
+  ui.openGameReviewBtn = document.getElementById("openGameReviewBtn");
+  ui.reviewBluffRateText = document.getElementById("reviewBluffRateText");
+  ui.reviewChallengeAccuracyText = document.getElementById("reviewChallengeAccuracyText");
+  ui.reviewOptimalDecisionsText = document.getElementById("reviewOptimalDecisionsText");
+  ui.reviewFeedbackText = document.getElementById("reviewFeedbackText");
+  ui.reviewHighlightsList = document.getElementById("reviewHighlightsList");
+  ui.reviewShareBtn = document.getElementById("reviewShareBtn");
+  ui.reviewPlayAgainBtn = document.getElementById("reviewPlayAgainBtn");
+  ui.reviewBackToMenuBtn = document.getElementById("reviewBackToMenuBtn");
 
   ui.avatarModal = document.getElementById("avatarModal");
   ui.avatarModalCloseBtn = document.getElementById("avatarModalCloseBtn");

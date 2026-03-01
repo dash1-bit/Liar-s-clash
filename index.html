@@ -229,10 +229,44 @@
         </div>
         <div class="result-actions">
           <button id="playAgainBtn" class="btn mode-btn" type="button">Play Again</button>
+          <button id="openGameReviewBtn" class="btn btn-primary mode-btn" type="button">Game Review</button>
           <button id="shareResultBtn" class="btn" type="button">Share</button>
           <button id="backToMenuBtn" class="btn" type="button">Back to Menu</button>
         </div>
         <p class="result-site">Play free at liar-s-clash.vercel.app</p>
+      </div>
+    </section>
+
+    <section id="reviewScreen" class="screen" aria-label="Post Game Review">
+      <div class="screen-card review-card">
+        <h2 class="section-title">Post Game Review</h2>
+
+        <section class="review-summary-block" aria-label="Review summary">
+          <div class="review-stat-row">
+            <p class="review-stat-label">Bluff Success Rate</p>
+            <p id="reviewBluffRateText" class="review-stat-value">0%</p>
+          </div>
+          <div class="review-stat-row">
+            <p class="review-stat-label">Challenge Accuracy</p>
+            <p id="reviewChallengeAccuracyText" class="review-stat-value">0%</p>
+          </div>
+          <div class="review-stat-row">
+            <p class="review-stat-label">Optimal Decisions</p>
+            <p id="reviewOptimalDecisionsText" class="review-stat-value">0%</p>
+          </div>
+          <p id="reviewFeedbackText" class="review-feedback-text">You made smart plays and strong reads.</p>
+        </section>
+
+        <section class="review-moments-block" aria-label="Highlighted moments">
+          <h3 class="panel-subtitle review-moments-title">Highlighted Moments</h3>
+          <div id="reviewHighlightsList" class="review-moments-list"></div>
+        </section>
+
+        <div class="result-actions">
+          <button id="reviewShareBtn" class="btn btn-secondary mode-btn" type="button">Share Highlight</button>
+          <button id="reviewPlayAgainBtn" class="btn mode-btn" type="button">Play Again</button>
+          <button id="reviewBackToMenuBtn" class="btn mode-btn" type="button">Back to Menu</button>
+        </div>
       </div>
     </section>
   </div>
