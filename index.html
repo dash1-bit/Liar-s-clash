@@ -120,6 +120,9 @@
           <h2 id="roundLabel" class="round-label">ROUND 1/10</h2>
           <p id="timerText" class="timer-text">--</p>
           <p id="turnIndicator" class="turn-indicator">Your turn</p>
+          <button id="gameEventBanner" class="game-event-banner" type="button" aria-label="Game Event details">
+            Game Event: No Event
+          </button>
         </section>
 
         <section id="topPanel" class="panel player-panel">
@@ -237,6 +240,18 @@
     <div class="hero-tooltip-card">
       <p id="heroTooltipTitle" class="hero-tooltip-title">Hero</p>
       <p id="heroTooltipText" class="hero-tooltip-text">Power description</p>
+    </div>
+  </div>
+  <div
+    id="gameEventTooltipOverlay"
+    class="game-event-tooltip-overlay hidden"
+    role="dialog"
+    aria-modal="false"
+    aria-label="Game Event details"
+  >
+    <div class="game-event-tooltip-card">
+      <p id="gameEventTooltipTitle" class="hero-tooltip-title">Game Event</p>
+      <p id="gameEventTooltipText" class="hero-tooltip-text">Standard rules.</p>
     </div>
   </div>
 

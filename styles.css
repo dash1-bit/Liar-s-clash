@@ -581,6 +581,31 @@ body {
   text-transform: uppercase;
 }
 
+.game-event-banner {
+  grid-column: 1 / -1;
+  justify-self: center;
+  min-height: 28px;
+  border: 1px solid rgba(237, 198, 94, 0.78);
+  border-radius: 999px;
+  background: rgba(20, 19, 17, 0.96);
+  color: #f7de99;
+  padding: 4px 10px;
+  font-size: clamp(0.67rem, 2.1vw, 0.78rem);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.game-event-banner:focus-visible {
+  outline: 2px solid rgba(237, 198, 94, 0.88);
+  outline-offset: 2px;
+}
+
 .turn-indicator--your-turn {
   color: #162708;
   border-color: rgba(129, 182, 76, 0.88);
@@ -843,6 +868,10 @@ body {
   border-color: rgba(140, 140, 140, 0.58);
 }
 
+.role-card.opponent-hidden {
+  border-color: rgba(121, 117, 111, 0.72);
+}
+
 .role-card.opponent-played {
   filter: none;
 }
@@ -882,6 +911,13 @@ body {
   background-position: center;
   background-repeat: no-repeat;
   transform: scale(1.02);
+}
+
+.card-art-hidden {
+  background:
+    radial-gradient(circle at 25% 20%, rgba(255, 255, 255, 0.08), transparent 44%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 5px, rgba(0, 0, 0, 0.08) 5px 10px),
+    #1d1c1a;
 }
 
 .card-art-angel {
@@ -1207,11 +1243,34 @@ body {
   pointer-events: none;
 }
 
+.game-event-tooltip-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 139;
+  background: transparent;
+  display: grid;
+  place-items: start center;
+  padding: calc(var(--pad) + env(safe-area-inset-top) + 92px) 12px 12px;
+  pointer-events: none;
+}
+
 .hero-tooltip-card {
   width: min(88vw, 320px);
   border: 2px solid var(--line);
   border-radius: 12px;
   background: rgba(35, 33, 30, 0.98);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.34);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.game-event-tooltip-card {
+  width: min(90vw, 330px);
+  border: 2px solid rgba(237, 198, 94, 0.78);
+  border-radius: 12px;
+  background: rgba(22, 21, 19, 0.98);
   box-shadow: 0 12px 20px rgba(0, 0, 0, 0.34);
   padding: 10px 12px;
   display: grid;
