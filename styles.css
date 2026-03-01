@@ -335,6 +335,11 @@ body {
   cursor: pointer;
 }
 
+.profile-hero-label {
+  margin-bottom: -2px;
+  text-align: center;
+}
+
 .avatar-preview-label {
   font-weight: 700;
   font-size: var(--fs-sm);
@@ -680,9 +685,30 @@ body {
   gap: 8px;
 }
 
+.player-name-block {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hero-context-label {
+  margin: 0;
+  font-size: clamp(0.58rem, 1.8vw, 0.68rem);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #c8c7c4;
+  font-weight: 800;
+}
+
 .player-avatar {
   width: clamp(42px, 12vw, 58px);
   border-radius: 12px;
+  cursor: pointer;
+}
+
+.player-avatar:focus-visible {
+  outline: 2px solid rgba(151, 201, 101, 0.9);
+  outline-offset: 2px;
 }
 
 .player-name {
@@ -1170,6 +1196,42 @@ body {
   background: var(--bg-dark);
 }
 
+.hero-tooltip-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  background: transparent;
+  display: grid;
+  place-items: start center;
+  padding: calc(var(--pad) + env(safe-area-inset-top) + 56px) 12px 12px;
+  pointer-events: none;
+}
+
+.hero-tooltip-card {
+  width: min(88vw, 320px);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: rgba(35, 33, 30, 0.98);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.34);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.hero-tooltip-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 900;
+}
+
+.hero-tooltip-text {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: #dfdfdb;
+  line-height: 1.25;
+}
+
 .response-overlay.decision-attention {
   animation: decisionOverlayPulse 780ms ease-in-out infinite;
 }
@@ -1641,7 +1703,7 @@ body {
 
 .avatar-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 8px;
 }
@@ -1650,14 +1712,16 @@ body {
   border: 2px solid var(--line);
   border-radius: 12px;
   background: #2e2b28;
-  min-height: 96px;
+  min-height: 124px;
   display: grid;
-  gap: 6px;
+  gap: 5px;
   justify-items: center;
-  align-content: center;
+  align-content: start;
+  padding: 8px 6px;
   cursor: pointer;
   font-weight: 700;
   font-size: var(--fs-xs);
+  text-align: center;
 }
 
 .avatar-choice .avatar-art {
@@ -1666,6 +1730,13 @@ body {
 
 .avatar-choice-label {
   color: #e5e4e2;
+}
+
+.avatar-choice-desc {
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+  color: #c9c7c3;
+  font-weight: 600;
 }
 
 .rules-text {
@@ -1995,5 +2066,11 @@ body {
 
   .player-avatar {
     width: clamp(40px, 11vw, 52px);
+  }
+}
+
+@media (max-width: 360px) {
+  .avatar-grid {
+    grid-template-columns: 1fr;
   }
 }

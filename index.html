@@ -22,9 +22,10 @@
           <p class="level-pill">Ranking <span id="homeRankingValue">1000</span></p>
         </div>
 
-        <button id="avatarPreviewBtn" class="avatar-preview" type="button" aria-label="Choose avatar">
+        <p class="field-label profile-hero-label">Hero</p>
+        <button id="avatarPreviewBtn" class="avatar-preview" type="button" aria-label="Choose hero">
           <span id="avatarPreviewArt" class="avatar-art avatar-1"></span>
-          <span id="avatarPreviewLabel" class="avatar-preview-label">Avatar 1</span>
+          <span id="avatarPreviewLabel" class="avatar-preview-label">Adventurer</span>
         </button>
 
         <label class="field-label" for="playerNameInput">Player Name</label>
@@ -123,8 +124,17 @@
 
         <section id="topPanel" class="panel player-panel">
           <div class="player-head">
-            <span id="topAvatar" class="avatar-art avatar-bot player-avatar"></span>
-            <h3 id="topNameText" class="player-name">Opponent</h3>
+            <span
+              id="topAvatar"
+              class="avatar-art avatar-bot player-avatar"
+              role="button"
+              tabindex="0"
+              aria-label="Opponent Hero"
+            ></span>
+            <div class="player-name-block">
+              <p class="hero-context-label">Opponent Hero</p>
+              <h3 id="topNameText" class="player-name">Opponent</h3>
+            </div>
             <p id="topStatsText" class="player-stats">HP: 5 | Gold: 2</p>
           </div>
           <div id="topCards" class="card-grid" aria-label="Opponent role cards"></div>
@@ -138,8 +148,17 @@
 
         <section id="bottomPanel" class="panel player-panel">
           <div class="player-head">
-            <span id="bottomAvatar" class="avatar-art avatar-1 player-avatar"></span>
-            <h3 id="bottomNameText" class="player-name">You</h3>
+            <span
+              id="bottomAvatar"
+              class="avatar-art avatar-1 player-avatar"
+              role="button"
+              tabindex="0"
+              aria-label="Your Hero"
+            ></span>
+            <div class="player-name-block">
+              <p class="hero-context-label">Your Hero</p>
+              <h3 id="bottomNameText" class="player-name">You</h3>
+            </div>
             <p id="bottomStatsText" class="player-stats">HP: 5 | Gold: 2</p>
           </div>
           <div class="bottom-cards-actions">
@@ -214,6 +233,12 @@
   </section>
   <p id="copyToast" class="copy-toast hidden" role="status" aria-live="polite">Copied!</p>
   <p id="actionToast" class="action-toast hidden" role="status" aria-live="polite"></p>
+  <div id="heroTooltipOverlay" class="hero-tooltip-overlay hidden" role="dialog" aria-modal="false" aria-label="Hero details">
+    <div class="hero-tooltip-card">
+      <p id="heroTooltipTitle" class="hero-tooltip-title">Hero</p>
+      <p id="heroTooltipText" class="hero-tooltip-text">Power description</p>
+    </div>
+  </div>
 
   <section id="tutorialModal" class="modal-overlay tutorial-modal hidden" role="dialog" aria-modal="true" aria-label="Quick tutorial">
     <div class="tutorial-shell">
@@ -255,22 +280,35 @@
     </div>
   </section>
 
-  <section id="avatarModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Select avatar">
+  <section id="avatarModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Select hero">
     <div class="modal-card">
-      <button id="avatarModalCloseBtn" class="modal-close-btn" type="button" aria-label="Close avatar selector">X</button>
-      <h2 class="section-title">Choose Avatar</h2>
+      <button id="avatarModalCloseBtn" class="modal-close-btn" type="button" aria-label="Close hero selector">X</button>
+      <h2 class="section-title">Choose Hero</h2>
       <div class="avatar-grid">
-        <button class="avatar-choice" type="button" data-avatar-id="avatar-1">
+        <button class="avatar-choice" type="button" data-hero-id="adventurer">
           <span class="avatar-art avatar-1"></span>
           <span class="avatar-choice-label">Adventurer</span>
+          <span class="avatar-choice-desc">Interest gives +2 Gold instead of +1.</span>
         </button>
-        <button class="avatar-choice" type="button" data-avatar-id="avatar-2">
+        <button class="avatar-choice" type="button" data-hero-id="noble">
           <span class="avatar-art avatar-2"></span>
           <span class="avatar-choice-label">Noble</span>
+          <span class="avatar-choice-desc">Basic Strike deals 2 damage.</span>
         </button>
-        <button class="avatar-choice" type="button" data-avatar-id="avatar-3">
+        <button class="avatar-choice" type="button" data-hero-id="rogue">
           <span class="avatar-art avatar-3"></span>
           <span class="avatar-choice-label">Rogue</span>
+          <span class="avatar-choice-desc">First turn: optional 0-4 card swap.</span>
+        </button>
+        <button class="avatar-choice" type="button" data-hero-id="guardian">
+          <span class="avatar-art avatar-2"></span>
+          <span class="avatar-choice-label">Guardian</span>
+          <span class="avatar-choice-desc">Gain Shield at rounds 1 and 6.</span>
+        </button>
+        <button class="avatar-choice" type="button" data-hero-id="oracle">
+          <span class="avatar-art avatar-1"></span>
+          <span class="avatar-choice-label">Oracle</span>
+          <span class="avatar-choice-desc">Starts with 3 REAL and 1 BLUFF.</span>
         </button>
       </div>
     </div>
@@ -286,10 +324,9 @@
 Goal:
 Reduce opponent HP to 0.
 
-Pre-match swap phase:
-Both players get 4 random characters.
-Select 0-4 cards to swap, then tap ACCEPT.
-Phase ends when both accept or timer expires.
+Hero powers:
+Each hero has a passive power.
+Rogue swaps 0-4 cards only on their first turn.
 
 Turn order:
 Each round has 2 actions (one per player).
@@ -333,7 +370,7 @@ STRIKE -> 1 damage (2 Gold)
         <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Join all tournaments</span></article>
         <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Weekly prize tournament included!</span></article>
         <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Create private tournaments</span></article>
-        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Exclusive avatars</span></article>
+        <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Exclusive heroes</span></article>
         <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Character skins</span></article>
         <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>Special bots + trainer</span></article>
         <article class="premium-benefit"><span class="premium-benefit-icon">&#9670;</span><span>No ads</span></article>

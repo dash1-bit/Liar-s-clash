@@ -6,6 +6,7 @@ const PHASES = Object.freeze({
   awaitingDraftOpponent: "awaitingDraftOpponent",
   draftReveal: "draftReveal",
   gameStart: "gameStart",
+  rogueSwap: "rogueSwap",
   choosingAction: "choosingAction",
   awaitingResponse: "awaitingResponse",
   resolvingDelay: "resolvingDelay",
@@ -59,11 +60,12 @@ const BASIC_ACTIONS = Object.freeze({
 });
 
 const ASSET_MAP = Object.freeze({
-  avatarPaths: Object.freeze({
-    "avatar-1": "./Recursos/Adventurer_avatar.png",
-    "avatar-2": "./Recursos/Noble_avatar.png",
-    "avatar-3": "./Recursos/rogue_avatar.png",
-    "avatar-bot": "./Recursos/Noble_avatar.png"
+  heroPortraitPaths: Object.freeze({
+    adventurer: "./Recursos/Adventurer_avatar.png",
+    noble: "./Recursos/Noble_avatar.png",
+    rogue: "./Recursos/rogue_avatar.png",
+    guardian: "./Recursos/Guardian.png",
+    oracle: "./Recursos/Oracle.png"
   }),
   roleImagePaths: Object.freeze({
     SIREN: "./Recursos/Siren.png",
@@ -90,11 +92,37 @@ const ASSET_MAP = Object.freeze({
   badgePath: "./Recursos/Badge.png"
 });
 
-const AVATAR_PRESETS = Object.freeze({
-  "avatar-1": Object.freeze({ id: "avatar-1", label: "Adventurer" }),
-  "avatar-2": Object.freeze({ id: "avatar-2", label: "Noble" }),
-  "avatar-3": Object.freeze({ id: "avatar-3", label: "Rogue" }),
-  "avatar-bot": Object.freeze({ id: "avatar-bot", label: "Bot" })
+const HERO_REGISTRY = Object.freeze({
+  adventurer: Object.freeze({
+    id: "adventurer",
+    displayName: "Adventurer",
+    shortDescription: "Interest gives +2 Gold instead of +1.",
+    portraitPath: ASSET_MAP.heroPortraitPaths.adventurer
+  }),
+  noble: Object.freeze({
+    id: "noble",
+    displayName: "Noble",
+    shortDescription: "Basic Strike deals 2 damage.",
+    portraitPath: ASSET_MAP.heroPortraitPaths.noble
+  }),
+  rogue: Object.freeze({
+    id: "rogue",
+    displayName: "Rogue",
+    shortDescription: "First turn: optional 0-4 card swap.",
+    portraitPath: ASSET_MAP.heroPortraitPaths.rogue
+  }),
+  guardian: Object.freeze({
+    id: "guardian",
+    displayName: "Guardian",
+    shortDescription: "Gain Shield at round 1 and round 6.",
+    portraitPath: ASSET_MAP.heroPortraitPaths.guardian
+  }),
+  oracle: Object.freeze({
+    id: "oracle",
+    displayName: "Oracle",
+    shortDescription: "Start with 3 REAL cards and 1 BLUFF.",
+    portraitPath: ASSET_MAP.heroPortraitPaths.oracle
+  })
 });
 
 const ASSET_VERSION = "3";
@@ -113,7 +141,7 @@ const HOME_TIPS = Object.freeze([
   "Use reveals to reduce uncertainty, not to show off.",
   "Track which cards are REAL/FAKE as the match evolves.",
   "Don\u2019t accuse on impulse\u2014accuse when the risk is worth it.",
-  "Swap smart in the opening: keep flexible options.",
+  "Rogue can swap cards only on their first turn.",
   "Pressure low HP opponents\u2014force tough decisions.",
   "Sometimes ACCEPT is the best punish.",
   "Win the mind game, not just the numbers."
@@ -156,9 +184,9 @@ const ROLE_UNLOCK_LEVELS = Object.freeze({
 });
 
 const BOT_IDENTITIES = Object.freeze([
-  Object.freeze({ name: "Hikaru", avatarId: "avatar-2" }),
-  Object.freeze({ name: "Danny", avatarId: "avatar-1" }),
-  Object.freeze({ name: "MrBeast", avatarId: "avatar-3" })
+  Object.freeze({ name: "Hikaru", heroId: "noble" }),
+  Object.freeze({ name: "Danny", heroId: "adventurer" }),
+  Object.freeze({ name: "MrBeast", heroId: "rogue" })
 ]);
 
 const RULES_ROLE_DETAILS = Object.freeze([
@@ -194,7 +222,7 @@ const modalState = { activeModal: null };
 const state = {
   screen: APP_SCREENS.home,
   mode: null,
-  profile: { name: "Matt", avatarId: "avatar-1", level: 1, ranking: 1000, opponentRanking: 1000 },
+  profile: { name: "Matt", heroId: "adventurer", level: 1, ranking: 1000, opponentRanking: 1000 },
   progression: { pendingUnlock: null },
   home: { tipIndex: 0 },
   friend: {
@@ -210,8 +238,8 @@ const state = {
   },
   localSlot: "human",
   slots: {
-    human: { id: "local-human", name: "Matt", avatarId: "avatar-1" },
-    bot: { id: "bot-ai", name: "Bot", avatarId: "avatar-bot" }
+    human: { id: "local-human", name: "Matt", heroId: "adventurer" },
+    bot: { id: "bot-ai", name: "Bot", heroId: "noble" }
   },
   phase: PHASES.idle,
   round: 1,
@@ -230,6 +258,9 @@ const state = {
   pendingChallengeResult: null,
   pendingClaim: null,
   draft: createDraftState(),
+  rogueSwap: createRogueSwapState(),
+  heroRuntime: createHeroRuntimeState(),
+  heroTooltip: { slot: null, open: false },
   currentActionText: "Ready.",
   events: [],
   resolutionToken: 0,
@@ -353,12 +384,12 @@ const net = {
             await channel.track({
               playerId: this.playerId,
               name: safePlayerName(state.profile.name),
-              avatarId: normalizeAvatarId(state.profile.avatarId),
+              heroId: normalizeHeroId(state.profile.heroId),
               role: this.role
             });
             this.presenceById[this.playerId] = {
               name: safePlayerName(state.profile.name),
-              avatarId: normalizeAvatarId(state.profile.avatarId),
+              heroId: normalizeHeroId(state.profile.heroId),
               role: this.role
             };
             this.connectedCount = Math.max(1, Object.keys(this.presenceById).length);
@@ -378,7 +409,7 @@ const net = {
               joined: true,
               role: this.role,
               name: safePlayerName(state.profile.name),
-              avatarId: normalizeAvatarId(state.profile.avatarId)
+              heroId: normalizeHeroId(state.profile.heroId)
             },
             { actorId: this.playerId }
           );
@@ -460,7 +491,7 @@ const net = {
       const latest = value[value.length - 1] || {};
       this.presenceById[key] = {
         name: safePlayerName(latest.name || "Player"),
-        avatarId: normalizeAvatarId(latest.avatarId || "avatar-1"),
+        heroId: normalizeHeroId(latest.heroId || "adventurer"),
         role: latest.role === "host" ? "host" : "guest"
       };
     });
@@ -531,6 +562,9 @@ const net = {
       return;
     }
 
+    if (msg.seq > 0 && !this.hostId) {
+      this.hostId = msg.senderId;
+    }
     const isCanonical = msg.seq > 0 && msg.senderId === this.hostId;
 
     if (isCanonical) {
@@ -622,6 +656,29 @@ const net = {
           actorSlot: payload.actorSlot,
           selected: normalizeDraftSelectionIndices(payload.selected),
           forced: Boolean(payload.forced)
+        },
+        {
+          canonical: true,
+          actorId: state.slots[payload.actorSlot].id,
+          applyLocal: true
+        }
+      );
+      return;
+    }
+
+    if (payload.kind === "ROGUE_SWAP_ACCEPT") {
+      if (state.screen !== APP_SCREENS.game) return;
+      if (!isRogueSwapPhase()) return;
+      if (payload.actorSlot !== "human" && payload.actorSlot !== "bot") return;
+      if (payload.actorSlot !== state.rogueSwap.actorSlot) return;
+      if (!state.slots[payload.actorSlot] || state.slots[payload.actorSlot].id !== msg.senderId) return;
+
+      await this.sendEvent(
+        "ACTION",
+        {
+          kind: "ROGUE_SWAP_ACCEPT",
+          actorSlot: payload.actorSlot,
+          selected: normalizeDraftSelectionIndices(payload.selected)
         },
         {
           canonical: true,
@@ -729,6 +786,24 @@ function createDraftState() {
   };
 }
 
+function createRogueSwapState() {
+  return {
+    active: false,
+    actorSlot: null,
+    selections: [],
+    revealUntil: 0,
+    pendingFinalize: false
+  };
+}
+
+function createHeroRuntimeState() {
+  return {
+    roundStartAppliedFor: 0,
+    rogueSwapUsed: { human: false, bot: false },
+    guardianRoundShield: { human: Object.create(null), bot: Object.create(null) }
+  };
+}
+
 function createEmptyLoadout() {
   return { realRoles: [], fakeRoles: [], cards: [] };
 }
@@ -798,12 +873,26 @@ function safePlayerName(name) {
   return cleaned || "Matt";
 }
 
+function normalizeHeroId(value) {
+  return HERO_REGISTRY[value] ? value : "adventurer";
+}
+
+function getHeroMeta(heroId) {
+  return HERO_REGISTRY[normalizeHeroId(heroId)] || HERO_REGISTRY.adventurer;
+}
+
+function getHeroIdForSlot(slot) {
+  const slotData = state.slots[slot];
+  if (!slotData) return "adventurer";
+  return normalizeHeroId(slotData.heroId);
+}
+
 function normalizeAvatarId(value) {
-  return AVATAR_PRESETS[value] ? value : "avatar-1";
+  return normalizeHeroId(value);
 }
 
 function getAvatarMeta(avatarId) {
-  return AVATAR_PRESETS[normalizeAvatarId(avatarId)] || AVATAR_PRESETS["avatar-1"];
+  return getHeroMeta(avatarId);
 }
 
 function withAssetVersion(path) {
@@ -850,8 +939,8 @@ function isPendingClaimCard(ownerSlot, card, cardIndex) {
 }
 
 function getAvatarPath(avatarId) {
-  const normalized = normalizeAvatarId(avatarId);
-  const path = ASSET_MAP.avatarPaths[normalized] || ASSET_MAP.avatarPaths["avatar-1"];
+  const normalized = normalizeHeroId(avatarId);
+  const path = ASSET_MAP.heroPortraitPaths[normalized] || ASSET_MAP.heroPortraitPaths.adventurer;
   return withAssetVersion(path);
 }
 
@@ -975,15 +1064,18 @@ function renderRoleDescription(node, role, card = null) {
 }
 
 function setActionDescriptions() {
+  const localSlot = state.localSlot || "human";
+  const interestAmount = getInterestGoldGain(localSlot);
+  const strikeAmount = getStrikeDamage(localSlot);
   if (ui.interestActionDesc) {
     ui.interestActionDesc.textContent = "";
-    appendText(ui.interestActionDesc, "+1 ");
+    appendText(ui.interestActionDesc, `+${interestAmount} `);
     const goldIcon = createInlineIcon("gold");
     if (goldIcon) ui.interestActionDesc.appendChild(goldIcon);
   }
   if (ui.strikeActionDesc) {
     ui.strikeActionDesc.textContent = "";
-    appendText(ui.strikeActionDesc, "Deal 1 ");
+    appendText(ui.strikeActionDesc, `Deal ${strikeAmount} `);
     const swordIcon = createInlineIcon("sword");
     if (swordIcon) ui.strikeActionDesc.appendChild(swordIcon);
     appendText(ui.strikeActionDesc, " DMG");
@@ -994,11 +1086,13 @@ function renderAvatarChoices() {
   if (!ui.avatarGrid) return;
   const choices = ui.avatarGrid.querySelectorAll(".avatar-choice");
   choices.forEach((choice) => {
-    const avatarId = normalizeAvatarId(choice.dataset.avatarId || "avatar-1");
+    const avatarId = normalizeHeroId(choice.dataset.heroId || "adventurer");
     const artNode = choice.querySelector(".avatar-art");
     const labelNode = choice.querySelector(".avatar-choice-label");
+    const descNode = choice.querySelector(".avatar-choice-desc");
     renderAvatar(artNode, avatarId);
-    if (labelNode) labelNode.textContent = getAvatarMeta(avatarId).label;
+    if (labelNode) labelNode.textContent = getAvatarMeta(avatarId).displayName;
+    if (descNode) descNode.textContent = getAvatarMeta(avatarId).shortDescription;
   });
 }
 
@@ -1212,6 +1306,28 @@ function getRoleDisplayName(role) {
   return String(role || "");
 }
 
+function slotHasHero(slot, heroId) {
+  return getHeroIdForSlot(slot) === normalizeHeroId(heroId);
+}
+
+function getInterestGoldGain(slot) {
+  return slotHasHero(slot, "adventurer") ? 2 : 1;
+}
+
+function getStrikeDamage(slot) {
+  return slotHasHero(slot, "noble") ? 2 : 1;
+}
+
+function getInitialRealCardCount(slot) {
+  return slotHasHero(slot, "oracle") ? 3 : 2;
+}
+
+function shouldTriggerRogueSwap(slot) {
+  if (!slotHasHero(slot, "rogue")) return false;
+  if (state.heroRuntime.rogueSwapUsed[slot]) return false;
+  return true;
+}
+
 function chooseBotIdentity() {
   const index = Math.floor(Math.random() * BOT_IDENTITIES.length);
   return BOT_IDENTITIES[index] || BOT_IDENTITIES[0];
@@ -1383,9 +1499,10 @@ function createDraftLoadoutFromRoles(roles) {
   return { realRoles: [], fakeRoles: [], cards };
 }
 
-function assignTruthToCards(cards, rng) {
+function assignTruthToCards(cards, rng, realCount = 2) {
   if (!Array.isArray(cards) || cards.length < 4) return;
-  const realIndices = new Set(pickUnique([0, 1, 2, 3], 2, rng));
+  const count = clamp(Number(realCount) || 0, 0, 4);
+  const realIndices = new Set(pickUnique([0, 1, 2, 3], count, rng));
   cards.forEach((card, index) => {
     card.isReal = realIndices.has(index);
     card.revealedUsed = false;
@@ -1428,22 +1545,26 @@ function buildDraftSwapResult(initialRoles, selectedIndices, seedText, level = s
   return roles;
 }
 
-function buildFinalLoadoutFromDraftRoles(draftRoles, seedText, playerKey) {
+function buildFinalLoadoutFromDraftRoles(draftRoles, seedText, playerKey, heroId = "adventurer") {
   const roles = Array.isArray(draftRoles) ? draftRoles.slice(0, 4) : [];
   const loadout = createDraftLoadoutFromRoles(roles);
   const rng = createSeededRng(`${seedText}:truth:${playerKey}`);
-  assignTruthToCards(loadout.cards, rng);
+  assignTruthToCards(loadout.cards, rng, normalizeHeroId(heroId) === "oracle" ? 3 : 2);
   const groups = rolesFromCards(loadout.cards);
   loadout.realRoles = groups.realRoles;
   loadout.fakeRoles = groups.fakeRoles;
   return loadout;
 }
 
-function buildDeterministicFinalLoadout(seedText, draftRoles) {
+function buildDeterministicFinalLoadout(seedText, draftRoles, heroIds = {}) {
   const roles = draftRoles || { human: [], bot: [] };
+  const heroBySlot = {
+    human: normalizeHeroId(heroIds.human || "adventurer"),
+    bot: normalizeHeroId(heroIds.bot || "adventurer")
+  };
   return {
-    human: buildFinalLoadoutFromDraftRoles(roles.human, seedText, "human"),
-    bot: buildFinalLoadoutFromDraftRoles(roles.bot, seedText, "bot")
+    human: buildFinalLoadoutFromDraftRoles(roles.human, seedText, "human", heroBySlot.human),
+    bot: buildFinalLoadoutFromDraftRoles(roles.bot, seedText, "bot", heroBySlot.bot)
   };
 }
 
@@ -1480,7 +1601,10 @@ function applyLoadoutToPlayer(playerKey, loadout) {
 function assignRandomRolesForBotMatch() {
   const seed = generateMatchSeed();
   const draft = buildDeterministicDraftRoles(seed);
-  const finalLoadout = buildDeterministicFinalLoadout(seed, draft);
+  const finalLoadout = buildDeterministicFinalLoadout(seed, draft, {
+    human: getHeroIdForSlot("human"),
+    bot: getHeroIdForSlot("bot")
+  });
   applyLoadoutToPlayer("human", finalLoadout.human);
   applyLoadoutToPlayer("bot", finalLoadout.bot);
 }
@@ -1603,9 +1727,23 @@ function scaleApprenticeCardsForNewRound(playerKey) {
 }
 
 function applyRoundStartPassives() {
+  if (state.heroRuntime.roundStartAppliedFor === state.round) return;
+  state.heroRuntime.roundStartAppliedFor = state.round;
+
   ["human", "bot"].forEach((playerKey) => {
     if (state.players[playerKey].bankerBuff) {
       applyGold(playerKey, 1, "BANKER passive");
+    }
+    if ((state.round === 1 || state.round === 6) && slotHasHero(playerKey, "guardian")) {
+      const shieldAppliedThisRound = Boolean(state.heroRuntime.guardianRoundShield[playerKey][state.round]);
+      if (!shieldAppliedThisRound) {
+        state.heroRuntime.guardianRoundShield[playerKey][state.round] = true;
+        if (!state.players[playerKey].shield) {
+          state.players[playerKey].shield = true;
+          triggerPlayerAnimation(playerKey, "heal");
+          pushDebugLog(`${slotLabel(playerKey)} gained Shield (GUARDIAN).`);
+        }
+      }
     }
     if (state.round > 1) scaleApprenticeCardsForNewRound(playerKey);
   });
@@ -1630,6 +1768,9 @@ function resetMatchState(options = {}) {
   state.phase = PHASES.idle;
   state.matchSeed = String(options.matchSeed || state.matchSeed || generateMatchSeed());
   state.draft = createDraftState();
+  state.rogueSwap = createRogueSwapState();
+  state.heroRuntime = createHeroRuntimeState();
+  state.heroTooltip = { slot: null, open: false };
   state.round = 1;
   state.roundActionCounter = 0;
   state.roundStarter = null;
@@ -1668,6 +1809,7 @@ async function backToMenu() {
   stopCurrentActionTypewriter();
   uiRuntime.lastActionText = "";
   clearActionToast();
+  closeHeroTooltip();
   state.phase = PHASES.idle;
   state.matchWinner = null;
   state.pendingAction = null;
@@ -1704,10 +1846,10 @@ async function backToMenu() {
   state.slots.human = {
     id: net.playerId,
     name: safePlayerName(state.profile.name),
-    avatarId: normalizeAvatarId(state.profile.avatarId)
+    heroId: normalizeHeroId(state.profile.heroId)
   };
   const botIdentity = chooseBotIdentity();
-  state.slots.bot = { id: "bot-ai", name: botIdentity.name, avatarId: botIdentity.avatarId };
+  state.slots.bot = { id: "bot-ai", name: botIdentity.name, heroId: botIdentity.heroId };
   state.localSlot = "human";
 
   setRoomIdInUrl("");
@@ -1729,31 +1871,39 @@ function startBotMatch() {
   state.slots.human = {
     id: net.playerId,
     name: safePlayerName(state.profile.name),
-    avatarId: normalizeAvatarId(state.profile.avatarId)
+    heroId: normalizeHeroId(state.profile.heroId)
   };
   const botIdentity = chooseBotIdentity();
-  state.slots.bot = { id: "bot-ai", name: botIdentity.name, avatarId: botIdentity.avatarId };
+  state.slots.bot = { id: "bot-ai", name: botIdentity.name, heroId: botIdentity.heroId };
   state.localSlot = "human";
 
   const matchSeed = generateMatchSeed();
   const starterRng = createSeededRng(`${matchSeed}:starter`);
   const draftRoles = buildDeterministicDraftRoles(matchSeed);
+  const finalLoadout = buildDeterministicFinalLoadout(matchSeed, draftRoles, {
+    human: state.slots.human.heroId,
+    bot: state.slots.bot.heroId
+  });
   const payload = {
-    stage: "draft-start",
+    stage: "match-start",
     matchSeed,
     startingActor: starterRng() < 0.5 ? "human" : "bot",
     players: {
       human: {
         id: state.slots.human.id,
         name: state.slots.human.name,
-        avatarId: state.slots.human.avatarId,
-        draftRoles: draftRoles.human
+        heroId: state.slots.human.heroId,
+        realRoles: finalLoadout.human.realRoles,
+        fakeRoles: finalLoadout.human.fakeRoles,
+        cards: finalLoadout.human.cards
       },
       bot: {
         id: state.slots.bot.id,
         name: state.slots.bot.name,
-        avatarId: state.slots.bot.avatarId,
-        draftRoles: draftRoles.bot
+        heroId: state.slots.bot.heroId,
+        realRoles: finalLoadout.bot.realRoles,
+        fakeRoles: finalLoadout.bot.fakeRoles,
+        cards: finalLoadout.bot.cards
       }
     }
   };
@@ -1788,9 +1938,9 @@ async function joinFriendRoomAsHost(roomId) {
   state.slots.human = {
     id: net.playerId,
     name: safePlayerName(state.profile.name),
-    avatarId: normalizeAvatarId(state.profile.avatarId)
+    heroId: normalizeHeroId(state.profile.heroId)
   };
-  state.slots.bot = { id: "pending-guest", name: "Friend", avatarId: "avatar-2" };
+  state.slots.bot = { id: "pending-guest", name: "Friend", heroId: "noble" };
 
   const joined = await net.joinRoom(roomId, "host");
   if (!joined) {
@@ -1817,7 +1967,7 @@ async function joinFriendRoomAsGuest(roomId) {
       joined: true,
       role: "guest",
       name: safePlayerName(state.profile.name),
-      avatarId: normalizeAvatarId(state.profile.avatarId),
+      heroId: normalizeHeroId(state.profile.heroId),
       needSync: true
     },
     {
@@ -1830,7 +1980,7 @@ async function joinFriendRoomAsGuest(roomId) {
 function buildFriendStartPayload() {
   const hostPresence = net.presenceById[net.playerId] || {
     name: safePlayerName(state.profile.name),
-    avatarId: normalizeAvatarId(state.profile.avatarId),
+    heroId: normalizeHeroId(state.profile.heroId),
     role: "host"
   };
 
@@ -1838,28 +1988,37 @@ function buildFriendStartPayload() {
   if (!guestEntry) return null;
 
   const [guestId, guestPresenceRaw] = guestEntry;
-  const guestPresence = guestPresenceRaw || { name: "Guest", avatarId: "avatar-2" };
+  const guestPresence = guestPresenceRaw || { name: "Guest", heroId: "noble" };
 
   const seed = generateMatchSeed();
   const draftRoles = buildDeterministicDraftRoles(seed);
+  const heroBySlot = {
+    human: normalizeHeroId(hostPresence.heroId || "adventurer"),
+    bot: normalizeHeroId(guestPresence.heroId || "adventurer")
+  };
+  const finalLoadout = buildDeterministicFinalLoadout(seed, draftRoles, heroBySlot);
   const starterRng = createSeededRng(`${seed}:starter`);
 
   return {
-    stage: "draft-start",
+    stage: "match-start",
     matchSeed: seed,
     startingActor: starterRng() < 0.5 ? "human" : "bot",
     players: {
       human: {
         id: net.playerId,
         name: safePlayerName(hostPresence.name),
-        avatarId: normalizeAvatarId(hostPresence.avatarId),
-        draftRoles: draftRoles.human
+        heroId: heroBySlot.human,
+        realRoles: finalLoadout.human.realRoles,
+        fakeRoles: finalLoadout.human.fakeRoles,
+        cards: finalLoadout.human.cards
       },
       bot: {
         id: guestId,
         name: safePlayerName(guestPresence.name),
-        avatarId: normalizeAvatarId(guestPresence.avatarId),
-        draftRoles: draftRoles.bot
+        heroId: heroBySlot.bot,
+        realRoles: finalLoadout.bot.realRoles,
+        fakeRoles: finalLoadout.bot.fakeRoles,
+        cards: finalLoadout.bot.cards
       }
     }
   };
@@ -1887,7 +2046,12 @@ async function startFriendMatchAsHost() {
 function applyFriendStart(payload) {
   if (!payload || !payload.players || !payload.players.human || !payload.players.bot) return;
 
-  if (payload.stage === "draft-final") {
+  if (payload.stage === "draft-final" || payload.stage === "match-start") {
+    applyDraftFinalStart(payload);
+    return;
+  }
+
+  if (payload.players.human.cards && payload.players.bot.cards) {
     applyDraftFinalStart(payload);
     return;
   }
@@ -1901,12 +2065,12 @@ function applyFriendStart(payload) {
   state.slots.human = {
     id: payload.players.human.id,
     name: safePlayerName(payload.players.human.name),
-    avatarId: normalizeAvatarId(payload.players.human.avatarId)
+    heroId: normalizeHeroId(payload.players.human.heroId || "adventurer")
   };
   state.slots.bot = {
     id: payload.players.bot.id,
     name: safePlayerName(payload.players.bot.name),
-    avatarId: normalizeAvatarId(payload.players.bot.avatarId)
+    heroId: normalizeHeroId(payload.players.bot.heroId || "adventurer")
   };
 
   state.localSlot = state.slots.human.id === net.playerId ? "human" : "bot";
@@ -1975,6 +2139,12 @@ function startDraftTimer() {
 function buildBotDraftSelections(seed) {
   const rng = createSeededRng(`${seed}:bot-swap`);
   const count = Math.floor(rng() * 3);
+  return normalizeDraftSelectionIndices(pickUnique([0, 1, 2, 3], count, rng));
+}
+
+function buildBotRogueSwapSelections(seed) {
+  const rng = createSeededRng(`${seed}:rogue-bot-swap`);
+  const count = Math.floor(rng() * 5);
   return normalizeDraftSelectionIndices(pickUnique([0, 1, 2, 3], count, rng));
 }
 
@@ -2050,7 +2220,7 @@ function buildDraftFinalPayload() {
       human: {
         id: state.slots.human.id,
         name: safePlayerName(state.slots.human.name),
-        avatarId: normalizeAvatarId(state.slots.human.avatarId),
+        heroId: normalizeHeroId(state.slots.human.heroId),
         realRoles: finalLoadout.human.realRoles,
         fakeRoles: finalLoadout.human.fakeRoles,
         cards: finalLoadout.human.cards
@@ -2058,7 +2228,7 @@ function buildDraftFinalPayload() {
       bot: {
         id: state.slots.bot.id,
         name: safePlayerName(state.slots.bot.name),
-        avatarId: normalizeAvatarId(state.slots.bot.avatarId),
+        heroId: normalizeHeroId(state.slots.bot.heroId),
         realRoles: finalLoadout.bot.realRoles,
         fakeRoles: finalLoadout.bot.fakeRoles,
         cards: finalLoadout.bot.cards
@@ -2076,12 +2246,12 @@ function applyDraftFinalStart(payload) {
   state.slots.human = {
     id: payload.players.human.id,
     name: safePlayerName(payload.players.human.name),
-    avatarId: normalizeAvatarId(payload.players.human.avatarId)
+    heroId: normalizeHeroId(payload.players.human.heroId)
   };
   state.slots.bot = {
     id: payload.players.bot.id,
     name: safePlayerName(payload.players.bot.name),
-    avatarId: normalizeAvatarId(payload.players.bot.avatarId)
+    heroId: normalizeHeroId(payload.players.bot.heroId)
   };
   state.localSlot = state.slots.human.id === net.playerId ? "human" : "bot";
   net.hostId = state.slots.human.id;
@@ -2097,7 +2267,7 @@ function applyDraftFinalStart(payload) {
 
   state.phase = PHASES.gameStart;
   state.screen = APP_SCREENS.game;
-  setCurrentAction("Draft done. Match start.");
+  setCurrentAction("Match start.");
   updateUI();
   setTimeout(() => beginTurn(), 220);
 }
@@ -2185,6 +2355,174 @@ function handleDraftTimeout() {
   }
 }
 
+function isRogueSwapPhase() {
+  return state.phase === PHASES.rogueSwap && Boolean(state.rogueSwap && state.rogueSwap.active);
+}
+
+function getRogueSwapSelections() {
+  if (!state.rogueSwap) return [];
+  return normalizeDraftSelectionIndices(state.rogueSwap.selections);
+}
+
+function setRogueSwapSelections(selections) {
+  if (!state.rogueSwap) state.rogueSwap = createRogueSwapState();
+  state.rogueSwap.selections = normalizeDraftSelectionIndices(selections);
+}
+
+function isRogueSwapCardSelectable(ownerSlot) {
+  if (!isRogueSwapPhase()) return false;
+  if (state.screen !== APP_SCREENS.game) return false;
+  if (ownerSlot !== state.localSlot) return false;
+  if (state.rogueSwap.actorSlot !== state.localSlot) return false;
+  if (state.friend.pendingRequest) return false;
+  return true;
+}
+
+function isRogueSwapCardSelected(ownerSlot, cardIndex) {
+  if (ownerSlot !== state.localSlot) return false;
+  if (!isRogueSwapPhase()) return false;
+  return getRogueSwapSelections().includes(cardIndex);
+}
+
+function isRogueSwapCardSwapping(ownerSlot, cardIndex) {
+  if (ownerSlot !== state.localSlot) return false;
+  if (!isRogueSwapPhase()) return false;
+  if (state.rogueSwap.actorSlot !== state.localSlot) return false;
+  const until = Number(state.rogueSwap.revealUntil) || 0;
+  if (until <= Date.now()) return false;
+  return getRogueSwapSelections().includes(cardIndex);
+}
+
+function startRogueSwapForSlot(actorSlot) {
+  if (actorSlot !== "human" && actorSlot !== "bot") return;
+  if (!shouldTriggerRogueSwap(actorSlot)) return;
+
+  state.heroRuntime.rogueSwapUsed[actorSlot] = true;
+  state.phase = PHASES.rogueSwap;
+  state.rogueSwap = createRogueSwapState();
+  state.rogueSwap.active = true;
+  state.rogueSwap.actorSlot = actorSlot;
+  clearTimer();
+  state.friend.pendingRequest = null;
+  closeHeroTooltip();
+
+  if (actorSlot === state.localSlot) {
+    setCurrentAction("Rogue Hero: select 0-4 cards, then ACCEPT.");
+  } else {
+    setCurrentAction(`${slotName(actorSlot)} is using Rogue swap...`);
+  }
+
+  if (state.mode === "bot" && actorSlot === "bot") {
+    const botSelections = buildBotRogueSwapSelections(state.matchSeed || generateMatchSeed());
+    setTimeout(() => {
+      if (!isRogueSwapPhase()) return;
+      if (state.rogueSwap.actorSlot !== "bot") return;
+      applyCanonicalRogueSwapAccept({ kind: "ROGUE_SWAP_ACCEPT", actorSlot: "bot", selected: botSelections });
+    }, 260);
+  }
+}
+
+function applyRogueSwapSelectionToPlayer(actorSlot, selectedIndices) {
+  const player = state.players[actorSlot];
+  if (!player || !Array.isArray(player.cards) || player.cards.length === 0) return;
+  const selected = normalizeDraftSelectionIndices(selectedIndices);
+  if (selected.length === 0) return;
+  const roles = player.cards.map((card) => card.role);
+  const swappedRoles = buildDraftSwapResult(roles, selected, `${state.matchSeed}:rogue-swap:${actorSlot}:${state.round}`, state.profile.level);
+  selected.forEach((index) => {
+    const card = player.cards[index];
+    if (!card) return;
+    card.role = swappedRoles[index];
+    applyCardRoleDefaults(card, card.role);
+  });
+  syncPlayerRoleLists(actorSlot);
+}
+
+function finalizeRogueSwapAndResume(actorSlot) {
+  state.rogueSwap = createRogueSwapState();
+  state.phase = PHASES.idle;
+  state.friend.pendingRequest = null;
+  setCurrentAction(actorSlot === state.localSlot ? "Rogue swap complete." : `${slotName(actorSlot)} finished Rogue swap.`);
+  setTimeout(() => {
+    if (state.screen === APP_SCREENS.game && state.phase !== PHASES.matchEnd) beginTurn();
+  }, 200);
+}
+
+async function submitLocalRogueSwapAccept() {
+  if (!isRogueSwapPhase()) return;
+  if (state.rogueSwap.actorSlot !== state.localSlot) return;
+  if (state.rogueSwap.pendingFinalize) return;
+
+  const actorSlot = state.localSlot;
+  const selected = getRogueSwapSelections();
+
+  if (state.mode === "friend") {
+    if (net.role === "host") {
+      await net.sendEvent(
+        "ACTION",
+        {
+          kind: "ROGUE_SWAP_ACCEPT",
+          actorSlot,
+          selected
+        },
+        {
+          canonical: true,
+          actorId: state.slots[actorSlot].id,
+          applyLocal: true
+        }
+      );
+      return;
+    }
+
+    state.friend.pendingRequest = "rogueSwap";
+    clearTimer();
+    updateUI();
+    await net.sendEvent(
+      "ACTION",
+      {
+        kind: "ROGUE_SWAP_ACCEPT",
+        actorSlot,
+        selected,
+        requestId: `${net.playerId}-${Date.now()}-rs`
+      },
+      {
+        actorId: state.slots[actorSlot].id,
+        seq: 0
+      }
+    );
+    return;
+  }
+
+  applyCanonicalRogueSwapAccept({ kind: "ROGUE_SWAP_ACCEPT", actorSlot, selected });
+}
+
+function applyCanonicalRogueSwapAccept(payload) {
+  if (!payload || !isRogueSwapPhase()) return;
+  const actorSlot = payload.actorSlot === "bot" ? "bot" : "human";
+  if (actorSlot !== state.rogueSwap.actorSlot) return;
+  if (state.rogueSwap.pendingFinalize) return;
+
+  const selected = normalizeDraftSelectionIndices(payload.selected);
+  setRogueSwapSelections(selected);
+  state.rogueSwap.pendingFinalize = true;
+  state.friend.pendingRequest = null;
+  clearTimer();
+
+  if (actorSlot === state.localSlot) {
+    state.rogueSwap.revealUntil = Date.now() + 420;
+    updateUI();
+  }
+
+  const delay = actorSlot === state.localSlot ? 420 : 220;
+  setTimeout(() => {
+    if (!isRogueSwapPhase()) return;
+    if (state.rogueSwap.actorSlot !== actorSlot) return;
+    if (!state.rogueSwap.pendingFinalize) return;
+    applyRogueSwapSelectionToPlayer(actorSlot, selected);
+    finalizeRogueSwapAndResume(actorSlot);
+  }, delay);
+}
+
 function isDraftCardSelectable(ownerSlot) {
   if (!isDraftSelectionPhase()) return false;
   if (state.screen !== APP_SCREENS.game) return false;
@@ -2237,6 +2575,8 @@ function buildSyncSnapshot() {
     phase: state.phase,
     matchSeed: state.matchSeed,
     draft: state.draft,
+    rogueSwap: state.rogueSwap,
+    heroRuntime: state.heroRuntime,
     round: state.round,
     roundActionCounter: state.roundActionCounter,
     roundStarter: state.roundStarter,
@@ -2292,6 +2632,28 @@ function applySyncPayload(payload) {
         finalizing: Boolean(snap.draft.finalizing)
       }
     : createDraftState();
+  state.rogueSwap = snap.rogueSwap
+    ? {
+        active: Boolean(snap.rogueSwap.active),
+        actorSlot: snap.rogueSwap.actorSlot === "bot" ? "bot" : snap.rogueSwap.actorSlot === "human" ? "human" : null,
+        selections: normalizeDraftSelectionIndices(snap.rogueSwap.selections),
+        revealUntil: Number(snap.rogueSwap.revealUntil) || 0,
+        pendingFinalize: Boolean(snap.rogueSwap.pendingFinalize)
+      }
+    : createRogueSwapState();
+  state.heroRuntime = snap.heroRuntime
+    ? {
+        roundStartAppliedFor: Number(snap.heroRuntime.roundStartAppliedFor) || 0,
+        rogueSwapUsed: {
+          human: Boolean(snap.heroRuntime.rogueSwapUsed && snap.heroRuntime.rogueSwapUsed.human),
+          bot: Boolean(snap.heroRuntime.rogueSwapUsed && snap.heroRuntime.rogueSwapUsed.bot)
+        },
+        guardianRoundShield: {
+          human: Object.assign(Object.create(null), snap.heroRuntime.guardianRoundShield && snap.heroRuntime.guardianRoundShield.human),
+          bot: Object.assign(Object.create(null), snap.heroRuntime.guardianRoundShield && snap.heroRuntime.guardianRoundShield.bot)
+        }
+      }
+    : createHeroRuntimeState();
   state.round = Number(snap.round) || 1;
   state.roundActionCounter = Number(snap.roundActionCounter) || 0;
   state.roundStarter = snap.roundStarter || null;
@@ -2311,12 +2673,12 @@ function applySyncPayload(payload) {
   state.slots.human = {
     id: snap.slots && snap.slots.human ? snap.slots.human.id : state.slots.human.id,
     name: safePlayerName(snap.slots && snap.slots.human ? snap.slots.human.name : "Host"),
-    avatarId: normalizeAvatarId(snap.slots && snap.slots.human ? snap.slots.human.avatarId : "avatar-1")
+    heroId: normalizeHeroId(snap.slots && snap.slots.human ? snap.slots.human.heroId : "adventurer")
   };
   state.slots.bot = {
     id: snap.slots && snap.slots.bot ? snap.slots.bot.id : state.slots.bot.id,
     name: safePlayerName(snap.slots && snap.slots.bot ? snap.slots.bot.name : "Guest"),
-    avatarId: normalizeAvatarId(snap.slots && snap.slots.bot ? snap.slots.bot.avatarId : "avatar-2")
+    heroId: normalizeHeroId(snap.slots && snap.slots.bot ? snap.slots.bot.heroId : "adventurer")
   };
 
   state.localSlot = state.slots.human.id === net.playerId ? "human" : "bot";
@@ -2498,6 +2860,11 @@ function beginTurn() {
   if (!actor) {
     state.phase = PHASES.idle;
     updateUI();
+    return;
+  }
+
+  if (shouldTriggerRogueSwap(actor)) {
+    startRogueSwapForSlot(actor);
     return;
   }
 
@@ -2844,8 +3211,8 @@ function applyEffect(action) {
   const target = action.target;
 
   if (action.kind === "basic") {
-    if (action.id === "INTEREST") applyGold(actor, 1, "INTEREST");
-    if (action.id === "STRIKE") applyDamage(target, 1, "STRIKE");
+    if (action.id === "INTEREST") applyGold(actor, getInterestGoldGain(actor), "INTEREST");
+    if (action.id === "STRIKE") applyDamage(target, getStrikeDamage(actor), "STRIKE");
     return;
   }
 
@@ -3260,6 +3627,10 @@ function applyCanonicalAction(payload) {
     applyCanonicalDraftAccept(payload);
     return;
   }
+  if (payload.kind === "ROGUE_SWAP_ACCEPT") {
+    applyCanonicalRogueSwapAccept(payload);
+    return;
+  }
   if (state.phase !== PHASES.choosingAction) return;
   if (payload.actorSlot !== state.currentActor) return;
   playAction(payload.input);
@@ -3390,6 +3761,13 @@ function getTurnIndicatorText() {
   if (state.phase === PHASES.awaitingDraftOpponent) return "WAITING FOR OPPONENT TO PRESS ACCEPT...";
   if (state.phase === PHASES.draftReveal) return "APPLYING SWAPS...";
   if (state.phase === PHASES.gameStart) return "PREPARING FIRST TURN...";
+  if (state.phase === PHASES.rogueSwap) {
+    if (state.rogueSwap.actorSlot === state.localSlot) {
+      if (state.friend.pendingRequest === "rogueSwap") return "WAITING HOST CONFIRMATION...";
+      return "ROGUE SWAP: SELECT 0-4, THEN ACCEPT";
+    }
+    return "OPPONENT ROGUE SWAP...";
+  }
 
   if (state.phase === PHASES.choosingAction) {
     if (state.currentActor === state.localSlot) {
@@ -3413,6 +3791,11 @@ function getTurnIndicatorText() {
 
 function getTurnIndicatorTone() {
   if (state.screen !== APP_SCREENS.game) return "neutral";
+  if (state.phase === PHASES.rogueSwap) {
+    if (state.rogueSwap.actorSlot === state.localSlot && state.friend.pendingRequest !== "rogueSwap") return "your-turn";
+    if (state.rogueSwap.actorSlot !== state.localSlot) return "opponent-turn";
+    return "neutral";
+  }
   if (state.phase === PHASES.choosingAction) {
     if (state.currentActor === state.localSlot && state.friend.pendingRequest !== "action") return "your-turn";
     if (state.currentActor !== state.localSlot) return "opponent-turn";
@@ -3463,12 +3846,51 @@ function getConnectionBannerText() {
 
 function getActiveTurnSlot() {
   if (state.screen !== APP_SCREENS.game) return null;
+  if (state.phase === PHASES.rogueSwap) return state.rogueSwap.actorSlot;
   if (state.phase === PHASES.choosingAction) return state.currentActor;
   if (state.phase === PHASES.awaitingResponse) {
     if (state.pendingResponder === state.localSlot && state.pendingAction) return state.pendingAction.actor;
     return state.pendingResponder;
   }
   return null;
+}
+
+function closeHeroTooltip() {
+  state.heroTooltip.open = false;
+  state.heroTooltip.slot = null;
+  if (ui.heroTooltipOverlay) ui.heroTooltipOverlay.classList.add("hidden");
+}
+
+function openHeroTooltip(slot) {
+  const resolvedSlot = slot === "bot" ? "bot" : "human";
+  const hero = getHeroMeta(getHeroIdForSlot(resolvedSlot));
+  state.heroTooltip.slot = resolvedSlot;
+  state.heroTooltip.open = true;
+  if (ui.heroTooltipTitle) ui.heroTooltipTitle.textContent = hero.displayName;
+  if (ui.heroTooltipText) ui.heroTooltipText.textContent = hero.shortDescription;
+  if (ui.heroTooltipOverlay) ui.heroTooltipOverlay.classList.remove("hidden");
+}
+
+function toggleHeroTooltip(slot) {
+  const resolvedSlot = slot === "bot" ? "bot" : "human";
+  if (state.heroTooltip.open && state.heroTooltip.slot === resolvedSlot) {
+    closeHeroTooltip();
+    return;
+  }
+  openHeroTooltip(resolvedSlot);
+}
+
+function syncHeroTooltip() {
+  if (!ui.heroTooltipOverlay) return;
+  if (!state.heroTooltip.open || state.screen !== APP_SCREENS.game) {
+    ui.heroTooltipOverlay.classList.add("hidden");
+    return;
+  }
+  const slot = state.heroTooltip.slot === "bot" ? "bot" : "human";
+  const hero = getHeroMeta(getHeroIdForSlot(slot));
+  if (ui.heroTooltipTitle) ui.heroTooltipTitle.textContent = hero.displayName;
+  if (ui.heroTooltipText) ui.heroTooltipText.textContent = hero.shortDescription;
+  ui.heroTooltipOverlay.classList.remove("hidden");
 }
 
 function renderAvatar(node, avatarId) {
@@ -3506,11 +3928,11 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     }
   }
 
-  if (isDraftCardSelectable(ownerSlot)) {
+  if (isDraftCardSelectable(ownerSlot) || isRogueSwapCardSelectable(ownerSlot)) {
     node.classList.add("draft-selectable");
-    if (isDraftCardSelected(ownerSlot, cardIndex)) node.classList.add("draft-selected");
+    if (isDraftCardSelected(ownerSlot, cardIndex) || isRogueSwapCardSelected(ownerSlot, cardIndex)) node.classList.add("draft-selected");
   }
-  if (isDraftCardSwapping(ownerSlot, cardIndex)) {
+  if (isDraftCardSwapping(ownerSlot, cardIndex) || isRogueSwapCardSwapping(ownerSlot, cardIndex)) {
     node.classList.add("draft-swapping");
   }
 
@@ -3622,8 +4044,10 @@ function renderCardsForSlot(container, slot, asInteractive) {
   const cards = Array.isArray(state.players[slot].cards) ? state.players[slot].cards : [];
   cards.forEach((card, index) => {
     const draftSelectable = isDraftCardSelectable(slot);
-    let enabled = asInteractive || draftSelectable;
-    if (enabled && !draftSelectable) {
+    const rogueSwapSelectable = isRogueSwapCardSelectable(slot);
+    const selectableMode = draftSelectable || rogueSwapSelectable;
+    let enabled = asInteractive || selectableMode;
+    if (enabled && !selectableMode) {
       const meta = getRoleMeta(card.role);
       if (!meta || meta.passive) enabled = false;
       if (enabled && state.players[slot].gold < getRoleCost(card.role, card)) enabled = false;
@@ -3680,8 +4104,8 @@ function updateUI() {
   });
 
   ui.playerNameInput.value = String(state.profile.name || "");
-  ui.avatarPreviewLabel.textContent = getAvatarMeta(state.profile.avatarId).label;
-  renderAvatar(ui.avatarPreviewArt, state.profile.avatarId);
+  ui.avatarPreviewLabel.textContent = getAvatarMeta(state.profile.heroId).displayName;
+  renderAvatar(ui.avatarPreviewArt, state.profile.heroId);
   if (ui.homeLevelValue) ui.homeLevelValue.textContent = String(state.profile.level);
   if (ui.homeRankingValue) ui.homeRankingValue.textContent = String(state.profile.ranking);
 
@@ -3727,32 +4151,46 @@ function updateUI() {
   const topSlot = opponentOf(state.localSlot);
   const bottomSlot = state.localSlot;
   const draftMode = isDraftPhase();
+  const rogueSwapMode = isRogueSwapPhase();
+  const swapMode = draftMode || rogueSwapMode;
   const localDraftPending =
     isDraftSelectionPhase() &&
     Boolean(state.draft) &&
     Boolean(state.localSlot) &&
     !Boolean(state.draft.accepted[state.localSlot]);
-  const hideDraftOpponentPanel = draftMode && localDraftPending;
+  const localRogueSwapPending =
+    rogueSwapMode &&
+    Boolean(state.rogueSwap) &&
+    state.rogueSwap.actorSlot === state.localSlot &&
+    !state.rogueSwap.pendingFinalize;
+  const hideDraftOpponentPanel =
+    (draftMode && localDraftPending) || (rogueSwapMode && state.rogueSwap.actorSlot === topSlot);
 
   ui.topNameText.textContent = slotName(topSlot);
   ui.bottomNameText.textContent = slotName(bottomSlot);
   renderStatsForSlot(ui.topStatsText, topSlot);
   renderStatsForSlot(ui.bottomStatsText, bottomSlot);
 
-  renderAvatar(ui.topAvatar, state.slots[topSlot].avatarId);
-  renderAvatar(ui.bottomAvatar, state.slots[bottomSlot].avatarId);
+  renderAvatar(ui.topAvatar, state.slots[topSlot].heroId);
+  renderAvatar(ui.bottomAvatar, state.slots[bottomSlot].heroId);
+  if (ui.topAvatar) ui.topAvatar.setAttribute("aria-label", `Opponent Hero: ${getHeroMeta(state.slots[topSlot].heroId).displayName}`);
+  if (ui.bottomAvatar) ui.bottomAvatar.setAttribute("aria-label", `Your Hero: ${getHeroMeta(state.slots[bottomSlot].heroId).displayName}`);
   ui.topPanel.classList.toggle("draft-opponent-hidden", hideDraftOpponentPanel);
   ui.topPanel.dataset.hiddenText =
-    hideDraftOpponentPanel && state.mode === "friend" && net.connectedCount < 2
+    rogueSwapMode && hideDraftOpponentPanel
+      ? "HIDDEN\nOpponent Hero is swapping"
+      : hideDraftOpponentPanel && state.mode === "friend" && net.connectedCount < 2
       ? "HIDDEN\nWaiting for opponent..."
       : hideDraftOpponentPanel
         ? "HIDDEN\nReveal after you press ACCEPT"
         : "";
 
-  ui.appRoot.classList.toggle("draft-open", draftMode);
-  ui.appRoot.classList.toggle("draft-local-pending", hideDraftOpponentPanel);
+  ui.appRoot.classList.toggle("draft-open", swapMode);
+  ui.appRoot.classList.toggle("draft-local-pending", localDraftPending || localRogueSwapPending);
   ui.roundLabel.textContent = draftMode
     ? "DRAFT PHASE"
+    : rogueSwapMode
+      ? "ROGUE SWAP"
     : `ROUND ${Math.min(state.round, MATCH_SETTINGS.MAX_ROUNDS)}/${MATCH_SETTINGS.MAX_ROUNDS}`;
   ui.timerText.textContent = state.timer.mode ? `${state.timer.remaining}s` : "--";
   ui.turnIndicator.textContent = getTurnIndicatorText();
@@ -3761,7 +4199,7 @@ function updateUI() {
   ui.turnIndicator.classList.toggle("turn-indicator--your-decision", turnTone === "your-decision");
   ui.turnIndicator.classList.toggle("turn-indicator--opponent-turn", turnTone === "opponent-turn");
   ui.turnIndicator.classList.toggle("turn-indicator--neutral", turnTone === "neutral");
-  ui.turnIndicator.classList.toggle("draft-instruction", localDraftPending);
+  ui.turnIndicator.classList.toggle("draft-instruction", localDraftPending || localRogueSwapPending);
   renderCurrentActionTypewriter(state.currentActionText);
 
   const activeTurnSlot = getActiveTurnSlot();
@@ -3773,7 +4211,7 @@ function updateUI() {
 
   const canLocalAct =
     state.screen === APP_SCREENS.game &&
-    !draftMode &&
+    !swapMode &&
     state.phase === PHASES.choosingAction &&
     state.currentActor === state.localSlot &&
     !state.friend.pendingRequest;
@@ -3782,8 +4220,10 @@ function updateUI() {
     state.phase === PHASES.awaitingResponse &&
     state.pendingResponder === state.localSlot &&
     !state.friend.pendingRequest;
-  const localTurnLocked = state.screen === APP_SCREENS.game && !draftMode && !canLocalAct && !inLocalDecision;
+  const localTurnLocked = state.screen === APP_SCREENS.game && !swapMode && !canLocalAct && !inLocalDecision;
+  const localSwapLocked = state.screen === APP_SCREENS.game && swapMode;
 
+  setActionDescriptions();
   const canUseStrike = canLocalAct && state.players[state.localSlot].gold >= BASIC_ACTIONS.STRIKE.cost;
   ui.interestBtn.disabled = false;
   ui.strikeBtn.disabled = false;
@@ -3791,19 +4231,25 @@ function updateUI() {
   ui.strikeBtn.classList.toggle("is-disabled", (!canUseStrike && !inLocalDecision) || localTurnLocked);
   ui.interestBtn.setAttribute("aria-disabled", canLocalAct ? "false" : "true");
   ui.strikeBtn.setAttribute("aria-disabled", canUseStrike ? "false" : "true");
-  ui.bottomPanel.classList.toggle("actions-locked", localTurnLocked);
+  ui.bottomPanel.classList.toggle("actions-locked", localTurnLocked || localSwapLocked);
 
   const showDraftAccept =
     state.screen === APP_SCREENS.game &&
-    isDraftSelectionPhase() &&
-    Boolean(state.draft) &&
-    Boolean(state.localSlot);
+    ((isDraftSelectionPhase() && Boolean(state.draft) && Boolean(state.localSlot)) ||
+      (rogueSwapMode && state.rogueSwap.actorSlot === state.localSlot));
   ui.draftAcceptBtn.classList.toggle("hidden", !showDraftAccept);
   if (showDraftAccept) {
-    const accepted = Boolean(state.draft.accepted[state.localSlot]);
-    ui.draftAcceptBtn.disabled = accepted;
-    ui.draftAcceptBtn.textContent = accepted ? "WAITING..." : "ACCEPT";
-    ui.draftAcceptBtn.classList.toggle("draft-accept-attention", !accepted);
+    if (rogueSwapMode && state.rogueSwap.actorSlot === state.localSlot) {
+      const waiting = Boolean(state.rogueSwap.pendingFinalize) || state.friend.pendingRequest === "rogueSwap";
+      ui.draftAcceptBtn.disabled = waiting;
+      ui.draftAcceptBtn.textContent = waiting ? "WAITING..." : "ACCEPT";
+      ui.draftAcceptBtn.classList.toggle("draft-accept-attention", !waiting);
+    } else {
+      const accepted = Boolean(state.draft.accepted[state.localSlot]);
+      ui.draftAcceptBtn.disabled = accepted;
+      ui.draftAcceptBtn.textContent = accepted ? "WAITING..." : "ACCEPT";
+      ui.draftAcceptBtn.classList.toggle("draft-accept-attention", !accepted);
+    }
   } else {
     ui.draftAcceptBtn.disabled = false;
     ui.draftAcceptBtn.textContent = "ACCEPT";
@@ -3812,7 +4258,7 @@ function updateUI() {
 
   renderCardsForSlot(ui.topCards, topSlot, false);
   renderCardsForSlot(ui.bottomCards, bottomSlot, canLocalAct);
-  ui.bottomCards.classList.toggle("draft-needs-accept", localDraftPending);
+  ui.bottomCards.classList.toggle("draft-needs-accept", localDraftPending || localRogueSwapPending);
 
   const showResponse =
     state.screen === APP_SCREENS.game &&
@@ -3847,8 +4293,9 @@ function updateUI() {
   if (ui.resultOpponentCard) ui.resultOpponentCard.classList.toggle("is-winner", state.matchWinner === opponentSlot);
   if (ui.resultLocalCard) ui.resultLocalCard.classList.toggle("is-draw", state.matchWinner === "draw");
   if (ui.resultOpponentCard) ui.resultOpponentCard.classList.toggle("is-draw", state.matchWinner === "draw");
-  renderAvatar(ui.resultLocalAvatar, state.slots[localSlot].avatarId);
-  renderAvatar(ui.resultOpponentAvatar, state.slots[opponentSlot].avatarId);
+  renderAvatar(ui.resultLocalAvatar, state.slots[localSlot].heroId);
+  renderAvatar(ui.resultOpponentAvatar, state.slots[opponentSlot].heroId);
+  syncHeroTooltip();
 }
 
 function triggerAnimation(element, className) {
@@ -4129,6 +4576,15 @@ function onBottomCardsClick(event) {
   const cardIndex = Number(button.dataset.cardIndex);
   if (Number.isNaN(cardIndex)) return;
 
+  if (isRogueSwapCardSelectable(state.localSlot)) {
+    const current = getRogueSwapSelections();
+    const exists = current.includes(cardIndex);
+    const next = exists ? current.filter((idx) => idx !== cardIndex) : [...current, cardIndex];
+    setRogueSwapSelections(next);
+    setCurrentAction(`Rogue swaps selected: ${normalizeDraftSelectionIndices(next).length}`);
+    return;
+  }
+
   if (isDraftSelectionPhase()) {
     if (!isDraftCardSelectable(state.localSlot)) return;
     const current = getDraftSelectionsForSlot(state.localSlot);
@@ -4145,13 +4601,13 @@ function onBottomCardsClick(event) {
 function onAvatarChoice(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
-  const choice = target.closest("button[data-avatar-id]");
+  const choice = target.closest("button[data-hero-id]");
   if (!(choice instanceof HTMLButtonElement)) return;
 
-  const avatarId = normalizeAvatarId(choice.dataset.avatarId || "avatar-1");
-  state.profile.avatarId = avatarId;
+  const heroId = normalizeHeroId(choice.dataset.heroId || "adventurer");
+  state.profile.heroId = heroId;
   if (state.mode !== "friend") {
-    state.slots.human.avatarId = avatarId;
+    state.slots.human.heroId = heroId;
   }
   closeModal(ui.avatarModal);
   updateUI();
@@ -4278,6 +4734,20 @@ function bindEvents() {
   ui.avatarPreviewBtn.addEventListener("click", () => openModal(ui.avatarModal));
   ui.avatarGrid.addEventListener("click", onAvatarChoice);
 
+  const onHeroPortraitKeydown = (slotGetter) => (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    toggleHeroTooltip(slotGetter());
+  };
+  if (ui.topAvatar) {
+    ui.topAvatar.addEventListener("click", () => toggleHeroTooltip(opponentOf(state.localSlot)));
+    ui.topAvatar.addEventListener("keydown", onHeroPortraitKeydown(() => opponentOf(state.localSlot)));
+  }
+  if (ui.bottomAvatar) {
+    ui.bottomAvatar.addEventListener("click", () => toggleHeroTooltip(state.localSlot));
+    ui.bottomAvatar.addEventListener("keydown", onHeroPortraitKeydown(() => state.localSlot));
+  }
+
   ui.playerNameInput.addEventListener("input", () => {
     state.profile.name = String(ui.playerNameInput.value || "");
     if (state.mode !== "friend") {
@@ -4290,6 +4760,10 @@ function bindEvents() {
   ui.strikeBtn.addEventListener("click", () => submitLocalAction("STRIKE"));
   ui.bottomCards.addEventListener("click", onBottomCardsClick);
   ui.draftAcceptBtn.addEventListener("click", () => {
+    if (isRogueSwapPhase()) {
+      void submitLocalRogueSwapAccept();
+      return;
+    }
     void submitLocalDraftAccept(false);
   });
 
@@ -4302,11 +4776,27 @@ function bindEvents() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (state.heroTooltip.open) {
+      closeHeroTooltip();
+      return;
+    }
     if (modalState.activeModal === ui.levelUnlockModal) {
       closeLevelUnlockModal();
       return;
     }
     closeModal();
+  });
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!state.heroTooltip.open) return;
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      closeHeroTooltip();
+      return;
+    }
+    if (target.closest(".hero-tooltip-card")) return;
+    if (target.closest("#topAvatar") || target.closest("#bottomAvatar")) return;
+    closeHeroTooltip();
   });
 
   applyCanonicalFromLocalStartIfNeeded();
@@ -4433,6 +4923,9 @@ function cacheElements() {
   ui.goPremiumBtn = document.getElementById("goPremiumBtn");
   ui.copyToast = document.getElementById("copyToast");
   ui.actionToast = document.getElementById("actionToast");
+  ui.heroTooltipOverlay = document.getElementById("heroTooltipOverlay");
+  ui.heroTooltipTitle = document.getElementById("heroTooltipTitle");
+  ui.heroTooltipText = document.getElementById("heroTooltipText");
 }
 
 function exposeSupabaseTest() {
@@ -4525,11 +5018,11 @@ async function init() {
   bindEvents();
 
   state.profile.name = safePlayerName(ui.playerNameInput.value);
-  state.profile.avatarId = normalizeAvatarId(state.profile.avatarId);
+  state.profile.heroId = normalizeHeroId(state.profile.heroId);
   state.slots.human = {
     id: net.playerId,
     name: state.profile.name,
-    avatarId: state.profile.avatarId
+    heroId: state.profile.heroId
   };
 
   const roomFromUrl = getRoomIdFromUrl();
