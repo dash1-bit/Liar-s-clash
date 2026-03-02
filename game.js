@@ -42,7 +42,7 @@ const MATCH_SETTINGS = Object.freeze({
 });
 
 const ROLE_CONFIG = Object.freeze({
-  SIREN: Object.freeze({ name: "SIREN", cost: 1, description: "1 DMG + skip next action", passive: false }),
+  SIREN: Object.freeze({ name: "SIREN", cost: 2, description: "1 DMG + skip next action", passive: false }),
   DWARF: Object.freeze({ name: "DWARF", cost: 1, description: "Shield next DMG", passive: false }),
   KNIGHT: Object.freeze({ name: "KNIGHT", cost: 2, description: "2 DMG", passive: false }),
   GOBLIN: Object.freeze({ name: "GOBLIN", cost: 0, description: "Steal 1 Gold", maxUses: 3, passive: false }),
@@ -54,7 +54,7 @@ const ROLE_CONFIG = Object.freeze({
   BERSERK: Object.freeze({ name: "BERSERK", cost: 0, description: "Self -1 HP enemy -2 HP", passive: false }),
   BANKER: Object.freeze({ name: "BANKER", cost: 3, description: "+1 Gold / round", passive: false }),
   ANGEL: Object.freeze({ name: "ANGEL", cost: 0, description: "Swap HP and Gold", maxUses: 1, passive: false }),
-  VALK: Object.freeze({ name: "VALK", cost: 3, description: "Enemy -1 HP self +1 HP", passive: false }),
+  VALK: Object.freeze({ name: "VALK", cost: 3, description: "Deal 1 DMG + self +1 HP", passive: false }),
   APPRENTICE: Object.freeze({ name: "APPRENTICE", cost: 2, description: "Scales each round", passive: false, apprentice: true })
 });
 
@@ -311,7 +311,7 @@ const ROLE_COLLECTION_META = Object.freeze({
   BERSERK: Object.freeze({ name: "Berserker", description: "Self -1 HP, opponent -2 HP." }),
   BANKER: Object.freeze({ name: "Banker", description: "Activate +1 Gold at the start of each round." }),
   ANGEL: Object.freeze({ name: "Angel", description: "Swap your HP and Gold." }),
-  VALK: Object.freeze({ name: "Valkyrie", description: "Opponent -1 HP, you +1 HP." }),
+  VALK: Object.freeze({ name: "Valkyrie", description: "Deal 1 damage and gain 1 HP." }),
   APPRENTICE: Object.freeze({ name: "Adept", description: "Damage and cost scale each round." })
 });
 
@@ -533,7 +533,7 @@ const BOT_IDENTITIES = Object.freeze([
 ]);
 
 const RULES_ROLE_DETAILS = Object.freeze([
-  Object.freeze({ role: "SIREN", text: "1 damage + skip opponent next action (1 Gold)" }),
+  Object.freeze({ role: "SIREN", text: "1 damage + skip opponent next action (2 Gold)" }),
   Object.freeze({ role: "DWARF", text: "Shield next damage (1 Gold)" }),
   Object.freeze({ role: "KNIGHT", text: "2 damage (2 Gold)" }),
   Object.freeze({ role: "GOBLIN", text: "Steal 1 Gold (max 3)" }),
@@ -545,7 +545,7 @@ const RULES_ROLE_DETAILS = Object.freeze([
   Object.freeze({ role: "BERSERK", text: "Self -1 HP, enemy -2 HP" }),
   Object.freeze({ role: "BANKER", text: "Activate +1 Gold / round buff (2 Gold)" }),
   Object.freeze({ role: "ANGEL", text: "Swap HP and Gold (0 Gold, max 1)" }),
-  Object.freeze({ role: "VALK", text: "Enemy -1 HP, self +1 HP (3 Gold)" }),
+  Object.freeze({ role: "VALK", text: "Deal 1 damage, self +1 HP (3 Gold)" }),
   Object.freeze({ role: "APPRENTICE", label: "ADEPT", text: "X damage, cost X+1, scales each round (cap 5/6)" })
 ]);
 
@@ -2038,9 +2038,9 @@ function renderRoleDescription(node, role, card = null) {
       icon("gold");
       break;
     case "VALK":
-      appendText(node, "Enemy -1 ");
-      icon("hp");
-      appendText(node, " self +1 ");
+      appendText(node, "1 ");
+      icon("sword");
+      appendText(node, " + self +1 ");
       icon("hp");
       break;
     case "APPRENTICE": {
@@ -5846,7 +5846,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     hasBadge = true;
   }
 
-  if (!hideOpponentCardDetails && meta && (roleCost > 0 || card.role === "ANGEL")) {
+  if (!hideOpponentCardDetails && meta && !meta.passive && roleCost > 0) {
     const cost = document.createElement("span");
     cost.className = "card-badge card-cost";
     cost.textContent = String(roleCost);
@@ -6133,6 +6133,7 @@ function buildCollectionItemsForTab(tab) {
   const unlockedCards = new Set(getUnlockedCardRoles());
   return getCardCollectionOrder().map((role) => {
     const meta = getRoleCollectionMeta(role);
+    const roleMeta = getRoleMeta(role);
     return {
       id: role,
       name: meta.name,
@@ -6140,6 +6141,7 @@ function buildCollectionItemsForTab(tab) {
       unlocked: unlockedCards.has(role),
       unlockText: getCollectionUnlockText("card", role),
       cost: getRoleCost(role),
+      passive: Boolean(roleMeta && roleMeta.passive),
       imagePath: getRoleImagePath(role),
       fallbackText: meta.name.slice(0, 2).toUpperCase()
     };
@@ -6182,10 +6184,12 @@ function renderCollectionList() {
     row.appendChild(textWrap);
     if (tab === "cards") {
       const cost = document.createElement("span");
-      cost.className = "card-badge card-cost collection-card-cost";
       const rawCost = Number(item.cost);
-      cost.textContent = Number.isFinite(rawCost) ? String(rawCost) : "0";
-      row.appendChild(cost);
+      if (!item.passive && Number.isFinite(rawCost) && rawCost > 0) {
+        cost.className = "card-badge card-cost collection-card-cost";
+        cost.textContent = String(rawCost);
+        row.appendChild(cost);
+      }
     }
     fragment.appendChild(row);
   });
