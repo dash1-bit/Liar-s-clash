@@ -1708,6 +1708,12 @@ body {
   color: #f3f3f3;
 }
 
+.card-damage {
+  background: rgba(151, 38, 38, 0.9);
+  color: #fff5f5;
+  border-color: rgba(255, 170, 170, 0.52);
+}
+
 .card-status-tag {
   color: #102205;
   border-color: rgba(129, 182, 76, 0.62);

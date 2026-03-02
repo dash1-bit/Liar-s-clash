@@ -53,7 +53,7 @@ const ROLE_DESCRIPTION_COPY = Object.freeze({
   SCIENTIST: "+1 🪙 · reveal enemy card",
   BANKER: "+1 🪙 / round",
   PIRATE: "1 ⚔ · +1 🪙",
-  APPRENTICE: "1 ⚔ · ⚔ + 🪙 increase each round",
+  APPRENTICE: "⚔ + 🪙 each round",
   ANGEL: "Swap ❤️ ↔ 🪙",
   JOKER: "1 ⚔ · Transform"
 });
@@ -329,7 +329,7 @@ const ROLE_COLLECTION_META = Object.freeze({
   BANKER: Object.freeze({ name: "Banker", description: ROLE_DESCRIPTION_COPY.BANKER }),
   ANGEL: Object.freeze({ name: "Angel", description: ROLE_DESCRIPTION_COPY.ANGEL }),
   VALK: Object.freeze({ name: "Valkyrie", description: ROLE_DESCRIPTION_COPY.VALK }),
-  APPRENTICE: Object.freeze({ name: "Adept", description: "Starts 1 ⚔. ⚔ + 🪙 increase each round." })
+  APPRENTICE: Object.freeze({ name: "Adept", description: ROLE_DESCRIPTION_COPY.APPRENTICE })
 });
 
 const MAX_PROGRESS_POINTS = LEAGUE_SEGMENTS[LEAGUE_SEGMENTS.length - 1].basePoints + 100;
@@ -5795,6 +5795,15 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     verifiedTag.className = `card-badge card-status-tag ${verifiedIsReal ? "card-real-tag" : "card-fake-tag"}`;
     verifiedTag.textContent = verifiedIsReal ? "REAL" : "BLUFF";
     badgeLeft.appendChild(verifiedTag);
+    hasBadge = true;
+  }
+
+  if (!hideOpponentCardDetails && card.role === "APPRENTICE") {
+    const dmg = clamp(typeof card.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+    const damageBadge = document.createElement("span");
+    damageBadge.className = "card-badge card-damage";
+    damageBadge.textContent = `${dmg} ⚔`;
+    badgeLeft.appendChild(damageBadge);
     hasBadge = true;
   }
 
