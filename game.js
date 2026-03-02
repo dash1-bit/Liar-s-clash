@@ -47,7 +47,7 @@ const ROLE_CONFIG = Object.freeze({
   KNIGHT: Object.freeze({ name: "KNIGHT", cost: 2, description: "2 DMG", passive: false }),
   GOBLIN: Object.freeze({ name: "GOBLIN", cost: 0, description: "Steal 1 Gold", maxUses: 3, passive: false }),
   ENT: Object.freeze({ name: "ENT", cost: 2, description: "+2 HP", passive: false }),
-  ELF: Object.freeze({ name: "ELF", cost: 2, description: "DMG 1\nEnemy card cost +1", passive: false }),
+  ELF: Object.freeze({ name: "ELF", cost: 2, description: "DMG 1\nEnemy cost +1", passive: false }),
   PIRATE: Object.freeze({ name: "PIRATE", cost: 0, description: "1 DMG +1 Gold", maxUses: 2, passive: false }),
   SCIENTIST: Object.freeze({ name: "SCIENTIST", cost: 0, description: "+1 Gold + reveal unknown card", maxUses: 2, passive: false }),
   JOKER: Object.freeze({ name: "JOKER", cost: 1, description: "1 DMG then transform", passive: false }),
@@ -304,7 +304,7 @@ const ROLE_COLLECTION_META = Object.freeze({
   KNIGHT: Object.freeze({ name: "Knight", description: "Deal 2 damage." }),
   GOBLIN: Object.freeze({ name: "Goblin", description: "Steal 1 Gold (max 3 uses)." }),
   ENT: Object.freeze({ name: "Ent", description: "Heal 2 HP." }),
-  ELF: Object.freeze({ name: "Elf", description: "DMG 1\nEnemy card cost +1" }),
+  ELF: Object.freeze({ name: "Elf", description: "DMG 1\nEnemy cost +1" }),
   PIRATE: Object.freeze({ name: "Pirate", description: "Deal 1 damage and gain 1 Gold." }),
   SCIENTIST: Object.freeze({ name: "Scientist", description: "Gain 1 Gold and reveal one unknown opponent card." }),
   JOKER: Object.freeze({ name: "Joker", description: "Deal 1 damage, then transform into another card." }),
@@ -539,7 +539,7 @@ const RULES_ROLE_DETAILS = Object.freeze([
   Object.freeze({ role: "GOBLIN", text: "Steal 1 Gold (max 3)" }),
   Object.freeze({ role: "ENT", text: "Heal 2 HP (2 Gold)" }),
   Object.freeze({ role: "PIRATE", text: "1 damage +1 Gold (max 2)" }),
-  Object.freeze({ role: "ELF", text: "DMG 1 / Enemy card cost +1 (2 Gold)" }),
+  Object.freeze({ role: "ELF", text: "DMG 1 / Enemy cost +1 (2 Gold)" }),
   Object.freeze({ role: "SCIENTIST", text: "+1 Gold + reveal one unknown card (max 2)" }),
   Object.freeze({ role: "JOKER", text: "1 damage (1 Gold), then transforms" }),
   Object.freeze({ role: "BERSERK", text: "Self -1 HP, enemy -2 HP" }),
@@ -2008,7 +2008,7 @@ function renderRoleDescription(node, role, card = null) {
         lineOne.textContent = "DMG 1";
         const lineTwo = document.createElement("span");
         lineTwo.className = "card-desc-elf-line";
-        lineTwo.textContent = "Enemy card cost +1";
+        lineTwo.textContent = "Enemy cost +1";
         node.appendChild(lineOne);
         node.appendChild(lineTwo);
       }
@@ -2789,8 +2789,6 @@ function applyElfCostIncrease(actorKey, targetKey, cardIndex) {
   if (targetIndex === null) return;
   const targetCard = targetCards[targetIndex];
   if (!targetCard) return;
-  const targetMeta = getRoleMeta(targetCard.role);
-  if (targetMeta && targetMeta.passive) return;
   targetCard.costModifier = Math.max(0, Number(targetCard.costModifier) || 0) + 1;
 }
 
