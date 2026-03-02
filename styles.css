@@ -79,6 +79,57 @@ body {
   padding: env(safe-area-inset-top) 0 calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
 
+.splash-screen {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.splash-content {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.splash-title {
+  margin: 0;
+  font-size: clamp(1.68rem, 7vw, 2.2rem);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #f4f4f1;
+}
+
+.splash-subtitle {
+  margin: 0;
+  font-size: clamp(0.86rem, 2.8vw, 1.02rem);
+  font-weight: 600;
+  color: #bdb9b1;
+}
+
+.splash-loader {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.splash-loader span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(129, 182, 76, 0.86);
+  animation: splashPulse 1s ease-in-out infinite;
+}
+
+.splash-loader span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.splash-loader span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
 .screen-with-tabs {
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
@@ -321,13 +372,13 @@ body {
 
 .home-main-zone {
   display: grid;
-  gap: 16px;
+  gap: 24px;
 }
 
 .home-actions-zone {
   display: grid;
   gap: 0;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .home-title-block {
@@ -364,7 +415,7 @@ body {
 
 .league-badge-btn {
   width: fit-content;
-  min-height: 34px;
+  min-height: 44px;
   border: 2px solid var(--line);
   border-radius: 999px;
   background: linear-gradient(180deg, #2f2d29, #262421);
@@ -372,7 +423,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0 18px;
   align-self: center;
   position: relative;
   cursor: pointer;
@@ -389,7 +440,7 @@ body {
 
 .league-badge-text {
   margin: 0;
-  font-size: clamp(0.8rem, 2.2vw, 0.92rem);
+  font-size: clamp(0.9rem, 2.7vw, 1.02rem);
   font-weight: 900;
   letter-spacing: 0.04em;
   color: #f7de99;
@@ -546,7 +597,7 @@ body {
   font-size: clamp(1.08rem, 3.5vw, 1.34rem);
   animation: playPulse 2.2s ease-in-out infinite;
   width: 100%;
-  margin-top: 0;
+  margin-top: 24px;
   margin-bottom: 20px;
   box-shadow:
     0 0 0 1px rgba(129, 182, 76, 0.24),
@@ -688,6 +739,18 @@ body {
   max-height: 130px;
   align-content: center;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+@keyframes splashPulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
 }
 
 .bottom-tab-bar {

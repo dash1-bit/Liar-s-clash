@@ -11,7 +11,19 @@
 </head>
 <body>
   <div id="appRoot" class="app-root">
-    <section id="homeScreen" class="screen screen-with-tabs active" aria-label="Home">
+    <section id="splashScreen" class="screen active splash-screen" aria-label="Intro splash">
+      <div class="splash-content">
+        <h1 class="splash-title">Gambit Liar's</h1>
+        <p class="splash-subtitle">Win the mind game.</p>
+        <div class="splash-loader" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="homeScreen" class="screen screen-with-tabs" aria-label="Home">
       <div class="home-shell">
         <header class="home-header-zone home-topbar">
           <section class="home-tip-compact" aria-label="Tips">

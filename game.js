@@ -15,6 +15,7 @@ const PHASES = Object.freeze({
 });
 
 const APP_SCREENS = Object.freeze({
+  splash: "splash",
   home: "home",
   collection: "collection",
   mode: "mode",
@@ -333,7 +334,8 @@ const UI_TIMINGS = Object.freeze({
   actionToastMs: 1800,
   currentActionTypeMs: 25,
   currentActionPauseMs: 4000,
-  homeTipsRotateMs: 5000
+  homeTipsRotateMs: 5000,
+  splashIntroMs: 2000
 });
 
 const HOME_TIPS = Object.freeze([
@@ -574,7 +576,7 @@ const uiRuntime = {
 const modalState = { activeModal: null };
 
 const state = {
-  screen: APP_SCREENS.home,
+  screen: APP_SCREENS.splash,
   mode: null,
   profile: { name: "Matt", heroId: "adventurer", ranking: 1000, opponentRanking: 1000 },
   progression: createDefaultProgressionState(),
@@ -6423,6 +6425,7 @@ function openHistoryReviewById(historyId, anchor = null) {
 
 function updateUI() {
   const map = {
+    [APP_SCREENS.splash]: ui.splashScreen,
     [APP_SCREENS.home]: ui.homeScreen,
     [APP_SCREENS.collection]: ui.collectionScreen,
     [APP_SCREENS.mode]: ui.modeScreen,
@@ -7895,6 +7898,7 @@ function bindEvents() {
 function cacheElements() {
   ui.appRoot = document.getElementById("appRoot");
 
+  ui.splashScreen = document.getElementById("splashScreen");
   ui.homeScreen = document.getElementById("homeScreen");
   ui.collectionScreen = document.getElementById("collectionScreen");
   ui.modeScreen = document.getElementById("modeScreen");
@@ -8174,6 +8178,10 @@ async function init() {
     name: state.profile.name,
     heroId: state.profile.heroId
   };
+
+  state.screen = APP_SCREENS.splash;
+  updateUI();
+  await wait(UI_TIMINGS.splashIntroMs);
 
   const roomFromUrl = getRoomIdFromUrl();
   if (roomFromUrl) {
