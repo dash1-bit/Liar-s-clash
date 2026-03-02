@@ -4665,7 +4665,10 @@ function handleScreenTransitionAnimations() {
   hideInlineHintTooltip();
   if (previous === APP_SCREENS.result) clearResultRevealTimers();
   if (previous === APP_SCREENS.review) clearReviewSequenceTimers();
-  if (current === APP_SCREENS.home) runHomePremiumIntroAnimation();
+  if (current === APP_SCREENS.home) {
+    runHomePremiumIntroAnimation();
+    runHomeLeagueBadgePopAnimation();
+  }
   if (current === APP_SCREENS.result) startResultRevealSequence();
   if (current === APP_SCREENS.review) startReviewRevealSequence();
 }
@@ -4680,6 +4683,18 @@ function runHomePremiumIntroAnimation() {
     if (!ui.premiumBtn) return;
     ui.premiumBtn.classList.remove("premium-intro-active");
   }, 900);
+}
+
+function runHomeLeagueBadgePopAnimation() {
+  if (!ui.leagueBadgeBtn) return;
+  triggerAnimation(ui.leagueBadgeBtn, "league-pop-animate");
+}
+
+function triggerPlayHapticFeedback() {
+  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+  try {
+    navigator.vibrate(10);
+  } catch {}
 }
 
 function shareReviewHighlightImage(anchor = null) {
@@ -7551,7 +7566,10 @@ function handlePlayAgain() {
 }
 
 function bindEvents() {
-  ui.homePlayBtn.addEventListener("click", () => runToModeScreen());
+  ui.homePlayBtn.addEventListener("click", () => {
+    triggerPlayHapticFeedback();
+    runToModeScreen();
+  });
   if (ui.homeTabBtn) {
     ui.homeTabBtn.addEventListener("click", () => {
       state.screen = APP_SCREENS.home;
