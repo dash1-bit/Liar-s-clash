@@ -25,65 +25,51 @@
 
     <section id="homeScreen" class="screen screen-with-tabs" aria-label="Home">
       <div class="home-shell">
-        <header class="home-header-zone home-topbar">
+        <header class="home-tip-row" aria-label="Tips">
           <section class="home-tip-compact" aria-label="Tips">
             <p id="homeTipText" class="home-tip-text">Bluff early to learn how your opponent reacts.</p>
             <div id="homeTipDots" class="home-tip-dots" aria-label="Tip indicators"></div>
           </section>
-          <div class="home-top-right">
-            <input
-              id="playerNameInput"
-              class="home-name-input"
-              type="text"
-              maxlength="18"
-              value="Matt"
-              autocomplete="off"
-              aria-label="Player Name"
-            />
-            <button id="homeTvBtn" class="home-tv-btn" type="button" aria-label="Reset progression">
-              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                <path d="M12 4a8 8 0 1 1-7.7 10.2 1 1 0 1 1 1.9-.5A6 6 0 1 0 7 9.4l1.9 1.9A1 1 0 1 1 7.5 12.7L4.1 9.3A1 1 0 0 1 4 8.6V5a1 1 0 1 1 2 0v1.6A8 8 0 0 1 12 4Z"></path>
-              </svg>
-            </button>
-          </div>
         </header>
 
-        <main class="home-main-zone">
-          <section class="home-title-block" aria-label="Title">
-            <h1 class="home-mini-title">Gambit Liar's</h1>
-            <p class="home-subtitle">Win the mind game.</p>
-          </section>
-
-          <button id="leagueBadgeBtn" class="league-badge-btn league-pill-btn" type="button" aria-label="Open League progression">
-            <span class="league-pill-prefix">LEAGUE:</span>
-            <span id="leagueBadgeText" class="league-badge-text">WOOD III</span>
-            <span id="leagueBadgeDot" class="notify-dot hidden" aria-hidden="true"></span>
-          </button>
-
-          <section class="home-hero-card" aria-label="Hero">
-            <p class="field-label profile-hero-label">Hero</p>
-            <button id="avatarPreviewBtn" class="avatar-preview" type="button" aria-label="Choose hero">
-              <span id="avatarPreviewDot" class="notify-dot hidden" aria-hidden="true"></span>
-              <span id="avatarPreviewArt" class="avatar-art avatar-1"></span>
-              <span id="avatarPreviewLabel" class="avatar-preview-label">Adventurer</span>
-            </button>
-          </section>
-        </main>
-
-        <div class="home-actions-zone">
-          <button id="homePlayBtn" class="btn btn-primary btn-play-pulse" type="button">PLAY</button>
-
-          <button id="premiumBtn" class="btn btn-premium premium-row-cta" type="button" aria-label="Open Premium">
-            <span class="premium-row-icon" aria-hidden="true">
+        <div class="home-player-row">
+          <input
+            id="playerNameInput"
+            class="home-name-input"
+            type="text"
+            maxlength="18"
+            value="Matt"
+            autocomplete="off"
+            aria-label="Player Name"
+          />
+          <button id="premiumBtn" class="btn btn-premium premium-crown-btn" type="button" aria-label="Open Premium">
+            <span class="premium-crown-label">Premium</span>
+            <span class="premium-crown-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false">
                 <path d="M4 8.5a1 1 0 0 1 1.7-.7L9 11l2.2-5.6a1 1 0 0 1 1.8 0L15.2 11l3.3-3.2A1 1 0 0 1 20 8.5l-1.8 8.4a1.2 1.2 0 0 1-1.2.9H7a1.2 1.2 0 0 1-1.2-.9L4 8.5Zm3.3 11.4a1 1 0 1 1 0-2h9.4a1 1 0 1 1 0 2H7.3Z"></path>
               </svg>
             </span>
-            <span class="premium-row-text">
-              <span class="premium-row-title">Premium</span>
-              <span class="premium-row-chevron" aria-hidden="true">&rsaquo;</span>
-            </span>
           </button>
+        </div>
+
+        <section class="home-league-block">
+          <p class="home-league-label">LEAGUE</p>
+          <button id="leagueBadgeBtn" class="league-badge-btn league-pill-btn" type="button" aria-label="Open League progression">
+            <span id="leagueBadgeText" class="league-badge-text">WOOD III</span>
+            <span id="leagueBadgeDot" class="notify-dot hidden" aria-hidden="true"></span>
+          </button>
+        </section>
+
+        <section class="home-hero-plain" aria-label="Hero">
+          <button id="avatarPreviewBtn" class="avatar-preview avatar-preview-plain" type="button" aria-label="Choose hero">
+            <span id="avatarPreviewDot" class="notify-dot hidden" aria-hidden="true"></span>
+            <span id="avatarPreviewArt" class="avatar-art avatar-1"></span>
+            <span id="avatarPreviewLabel" class="avatar-preview-label">Adventurer</span>
+          </button>
+        </section>
+
+        <div class="home-actions-zone">
+          <button id="homePlayBtn" class="btn btn-primary btn-play-pulse" type="button">PLAY</button>
         </div>
       </div>
     </section>

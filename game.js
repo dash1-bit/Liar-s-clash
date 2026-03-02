@@ -571,6 +571,8 @@ const uiRuntime = {
   reviewSequenceTimerIds: [],
   reviewMetricAnimationIds: [],
   inlineHintTimerId: null,
+  homePremiumIntroTimerId: null,
+  homePremiumIntroPlayed: false,
   lastScreen: null
 };
 const modalState = { activeModal: null };
@@ -4663,8 +4665,21 @@ function handleScreenTransitionAnimations() {
   hideInlineHintTooltip();
   if (previous === APP_SCREENS.result) clearResultRevealTimers();
   if (previous === APP_SCREENS.review) clearReviewSequenceTimers();
+  if (current === APP_SCREENS.home) runHomePremiumIntroAnimation();
   if (current === APP_SCREENS.result) startResultRevealSequence();
   if (current === APP_SCREENS.review) startReviewRevealSequence();
+}
+
+function runHomePremiumIntroAnimation() {
+  if (!ui.premiumBtn || uiRuntime.homePremiumIntroPlayed) return;
+  uiRuntime.homePremiumIntroPlayed = true;
+  ui.premiumBtn.classList.add("premium-intro-active");
+  if (uiRuntime.homePremiumIntroTimerId) clearTimeout(uiRuntime.homePremiumIntroTimerId);
+  uiRuntime.homePremiumIntroTimerId = setTimeout(() => {
+    uiRuntime.homePremiumIntroTimerId = null;
+    if (!ui.premiumBtn) return;
+    ui.premiumBtn.classList.remove("premium-intro-active");
+  }, 900);
 }
 
 function shareReviewHighlightImage(anchor = null) {
