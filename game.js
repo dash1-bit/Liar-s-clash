@@ -7556,8 +7556,7 @@ function bindEvents() {
   }
   if (ui.homeTvBtn) {
     ui.homeTvBtn.addEventListener("click", () => {
-      state.screen = APP_SCREENS.tv;
-      updateUI();
+      openModal(ui.resetProgressModal);
     });
   }
   ui.premiumBtn.addEventListener("click", () => openModal(ui.premiumModal));
