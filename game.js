@@ -345,6 +345,21 @@ const HOME_TIPS = Object.freeze([
   "Win the mind game, not just the numbers."
 ]);
 
+const RESULT_REVIEW_BADGE_OPTIONS = Object.freeze([
+  "1 Brilliant Catch!",
+  "1 Brilliant Bluff!",
+  "Perfect Read!",
+  "Psychological Masterplay!",
+  "Mind Game Victory!",
+  "Cold Blood Bluff!"
+]);
+
+const REVIEW_FINAL_MESSAGES = Object.freeze([
+  "You controlled the mind game.",
+  "Psychological victory.",
+  "You outplayed the bluff war."
+]);
+
 const FIRST_MATCH_GUIDE_STEPS = Object.freeze([
   Object.freeze({
     id: "welcome",
@@ -497,7 +512,13 @@ const uiRuntime = {
   firstGuideDecisionDelayTimerId: null,
   tutorialStepIndex: 0,
   homeTipTimerId: null,
-  homeTipFadeTimerId: null
+  homeTipFadeTimerId: null,
+  resultRevealBadgeTimerId: null,
+  resultRevealButtonsTimerId: null,
+  reviewSequenceToken: 0,
+  reviewSequenceTimerIds: [],
+  reviewMetricAnimationIds: [],
+  lastScreen: null
 };
 const modalState = { activeModal: null };
 
@@ -1151,7 +1172,9 @@ function createPostGameReviewState() {
     challengeAccuracy: 0,
     optimalDecisions: 0,
     feedback: "",
-    highlights: []
+    highlights: [],
+    matchBadgeText: RESULT_REVIEW_BADGE_OPTIONS[0],
+    finalMessage: REVIEW_FINAL_MESSAGES[0]
   };
 }
 
@@ -3933,6 +3956,12 @@ function toPercent(numerator, denominator, fallback = 50) {
   return clamp(Math.round((numerator / denominator) * 100), 0, 100);
 }
 
+function pickRandomFromList(list, fallback = "") {
+  if (!Array.isArray(list) || list.length === 0) return String(fallback || "");
+  const index = Math.floor(Math.random() * list.length);
+  return String(list[index] || fallback || "");
+}
+
 function getReviewEntryById(entryId) {
   if (!entryId || !state.review || !Array.isArray(state.review.actions)) return null;
   return state.review.actions.find((entry) => entry && entry.id === entryId) || null;
@@ -4074,7 +4103,7 @@ function buildPostGameReviewData(winnerKey = state.matchWinner) {
           entry,
           "Great Read",
           `You challenged opponent's ${entry.actionLabel}.`,
-          "Result: Correct challenge. Opponent lost 2 HP.",
+          "Opponent bluff caught.",
           95
         )
       );
@@ -4096,7 +4125,7 @@ function buildPostGameReviewData(winnerKey = state.matchWinner) {
           entry,
           "Risky Play",
           `You bluffed with ${entry.actionLabel} at low HP.`,
-          "Result: High-risk pressure play under stress.",
+          "Bold bluff under pressure.",
           76
         )
       );
@@ -4189,7 +4218,9 @@ function buildPostGameReviewData(winnerKey = state.matchWinner) {
     challengeAccuracy,
     optimalDecisions,
     feedback,
-    highlights: highlights.slice(0, 4)
+    highlights: highlights.slice(0, 4),
+    matchBadgeText: pickRandomFromList(RESULT_REVIEW_BADGE_OPTIONS, "Mind Game Victory!"),
+    finalMessage: pickRandomFromList(REVIEW_FINAL_MESSAGES, "Psychological victory.")
   };
 }
 
@@ -4199,15 +4230,36 @@ function ensurePostGameReviewReady() {
   }
 }
 
+function getReviewBadgeToneClass(label) {
+  const normalized = String(label || "").toLowerCase();
+  if (normalized.includes("brilliant bluff")) return "review-badge-gold";
+  if (normalized.includes("risky play")) return "review-badge-orange";
+  return "review-badge-green";
+}
+
 function renderPostGameReview() {
-  if (!ui.reviewBluffRateText || !ui.reviewChallengeAccuracyText || !ui.reviewOptimalDecisionsText || !ui.reviewFeedbackText || !ui.reviewHighlightsList)
-    return;
+  if (!ui.reviewBluffRateText || !ui.reviewChallengeAccuracyText || !ui.reviewOptimalDecisionsText || !ui.reviewFeedbackText || !ui.reviewHighlightsList) return;
   ensurePostGameReviewReady();
   const review = state.postGameReview || createPostGameReviewState();
-  ui.reviewBluffRateText.textContent = `${clamp(Number(review.bluffSuccessRate) || 0, 0, 100)}%`;
-  ui.reviewChallengeAccuracyText.textContent = `${clamp(Number(review.challengeAccuracy) || 0, 0, 100)}%`;
-  ui.reviewOptimalDecisionsText.textContent = `${clamp(Number(review.optimalDecisions) || 0, 0, 100)}%`;
+  const bluffRate = clamp(Number(review.bluffSuccessRate) || 0, 0, 100);
+  const challengeRate = clamp(Number(review.challengeAccuracy) || 0, 0, 100);
+  const optimalRate = clamp(Number(review.optimalDecisions) || 0, 0, 100);
+  ui.reviewBluffRateText.textContent = `${bluffRate}%`;
+  ui.reviewChallengeAccuracyText.textContent = `${challengeRate}%`;
+  ui.reviewOptimalDecisionsText.textContent = `${optimalRate}%`;
+  if (ui.reviewBluffRing) ui.reviewBluffRing.dataset.target = String(bluffRate);
+  if (ui.reviewChallengeRing) ui.reviewChallengeRing.dataset.target = String(challengeRate);
+  if (ui.reviewOptimalRing) ui.reviewOptimalRing.dataset.target = String(optimalRate);
   ui.reviewFeedbackText.textContent = String(review.feedback || "You made smart plays and valuable reads.");
+  if (ui.reviewFinalMessageText) {
+    ui.reviewFinalMessageText.textContent = String(review.finalMessage || "Psychological victory.");
+    ui.reviewFinalMessageText.classList.add("hidden");
+    ui.reviewFinalMessageText.classList.remove("review-final-message-visible");
+  }
+  if (ui.reviewMomentsTitle) {
+    ui.reviewMomentsTitle.classList.add("hidden");
+    ui.reviewMomentsTitle.classList.remove("review-moments-title-visible");
+  }
 
   ui.reviewHighlightsList.innerHTML = "";
   const fragment = document.createDocumentFragment();
@@ -4222,7 +4274,7 @@ function renderPostGameReview() {
     card.appendChild(turn);
 
     const badge = document.createElement("span");
-    badge.className = "review-moment-badge";
+    badge.className = `review-moment-badge ${getReviewBadgeToneClass(item.label)}`;
     badge.textContent = item.label || "Great Read";
     card.appendChild(badge);
 
@@ -4236,9 +4288,243 @@ function renderPostGameReview() {
     result.textContent = item.resultText || "Result: Strong pressure.";
     card.appendChild(result);
 
+    card.classList.remove("review-moment-visible");
     fragment.appendChild(card);
   });
   ui.reviewHighlightsList.appendChild(fragment);
+}
+
+function clearResultRevealTimers() {
+  if (uiRuntime.resultRevealBadgeTimerId) {
+    clearTimeout(uiRuntime.resultRevealBadgeTimerId);
+    uiRuntime.resultRevealBadgeTimerId = null;
+  }
+  if (uiRuntime.resultRevealButtonsTimerId) {
+    clearTimeout(uiRuntime.resultRevealButtonsTimerId);
+    uiRuntime.resultRevealButtonsTimerId = null;
+  }
+}
+
+function resetResultRevealNodes() {
+  if (ui.resultReviewBadge) {
+    ui.resultReviewBadge.classList.add("hidden");
+    ui.resultReviewBadge.classList.remove("result-review-badge-visible");
+  }
+  if (ui.openGameReviewBtn) {
+    ui.openGameReviewBtn.classList.add("hidden");
+    ui.openGameReviewBtn.classList.remove("result-review-btn-visible");
+  }
+  if (ui.resultBottomActions) {
+    ui.resultBottomActions.classList.add("hidden");
+    ui.resultBottomActions.classList.remove("result-bottom-actions-visible");
+  }
+}
+
+function startResultRevealSequence() {
+  clearResultRevealTimers();
+  resetResultRevealNodes();
+  ensurePostGameReviewReady();
+  if (ui.resultReviewBadge) {
+    ui.resultReviewBadge.textContent = String(state.postGameReview.matchBadgeText || pickRandomFromList(RESULT_REVIEW_BADGE_OPTIONS, "Perfect Read!"));
+  }
+  uiRuntime.resultRevealBadgeTimerId = setTimeout(() => {
+    uiRuntime.resultRevealBadgeTimerId = null;
+    if (state.screen !== APP_SCREENS.result) return;
+    if (ui.resultReviewBadge) {
+      ui.resultReviewBadge.classList.remove("hidden");
+      void ui.resultReviewBadge.offsetWidth;
+      ui.resultReviewBadge.classList.add("result-review-badge-visible");
+    }
+  }, 500);
+  uiRuntime.resultRevealButtonsTimerId = setTimeout(() => {
+    uiRuntime.resultRevealButtonsTimerId = null;
+    if (state.screen !== APP_SCREENS.result) return;
+    if (ui.openGameReviewBtn) {
+      ui.openGameReviewBtn.classList.remove("hidden");
+      ui.openGameReviewBtn.classList.add("result-review-btn-visible");
+    }
+    if (ui.resultBottomActions) {
+      ui.resultBottomActions.classList.remove("hidden");
+      ui.resultBottomActions.classList.add("result-bottom-actions-visible");
+    }
+  }, 1000);
+}
+
+function clearReviewSequenceTimers() {
+  uiRuntime.reviewSequenceToken += 1;
+  if (Array.isArray(uiRuntime.reviewSequenceTimerIds)) {
+    uiRuntime.reviewSequenceTimerIds.forEach((timerId) => clearTimeout(timerId));
+  }
+  uiRuntime.reviewSequenceTimerIds = [];
+  if (Array.isArray(uiRuntime.reviewMetricAnimationIds)) {
+    uiRuntime.reviewMetricAnimationIds.forEach((frameId) => cancelAnimationFrame(frameId));
+  }
+  uiRuntime.reviewMetricAnimationIds = [];
+}
+
+function queueReviewTimeout(callback, delayMs) {
+  const timerId = setTimeout(callback, Math.max(0, Number(delayMs) || 0));
+  uiRuntime.reviewSequenceTimerIds.push(timerId);
+  return timerId;
+}
+
+function animateMetricRing(ringNode, valueNode, targetPercent, token, durationMs = 720) {
+  const target = clamp(Number(targetPercent) || 0, 0, 100);
+  const startAt = performance.now();
+  const step = (now) => {
+    if (token !== uiRuntime.reviewSequenceToken || state.screen !== APP_SCREENS.review) return;
+    const elapsed = Math.max(0, now - startAt);
+    const progress = clamp(elapsed / durationMs, 0, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(target * eased);
+    if (ringNode) ringNode.style.setProperty("--progress", `${current}`);
+    if (valueNode) valueNode.textContent = `${current}%`;
+    if (progress < 1) {
+      const frameId = requestAnimationFrame(step);
+      uiRuntime.reviewMetricAnimationIds.push(frameId);
+    }
+  };
+  const frameId = requestAnimationFrame(step);
+  uiRuntime.reviewMetricAnimationIds.push(frameId);
+}
+
+function startReviewRevealSequence() {
+  clearReviewSequenceTimers();
+  if (!ui.reviewScreen) return;
+  const token = uiRuntime.reviewSequenceToken;
+  const metricItems = Array.from(ui.reviewScreen.querySelectorAll("[data-review-metric]"));
+  metricItems.forEach((node) => node.classList.remove("review-metric-visible"));
+  const metricSpecs = [
+    { item: metricItems[0], ring: ui.reviewBluffRing, value: ui.reviewBluffRateText, target: Number(ui.reviewBluffRing?.dataset.target) || 0, delay: 0 },
+    {
+      item: metricItems[1],
+      ring: ui.reviewChallengeRing,
+      value: ui.reviewChallengeAccuracyText,
+      target: Number(ui.reviewChallengeRing?.dataset.target) || 0,
+      delay: 800
+    },
+    { item: metricItems[2], ring: ui.reviewOptimalRing, value: ui.reviewOptimalDecisionsText, target: Number(ui.reviewOptimalRing?.dataset.target) || 0, delay: 1600 }
+  ];
+  metricSpecs.forEach((spec) => {
+    if (spec.ring) spec.ring.style.setProperty("--progress", "0");
+    if (spec.value) spec.value.textContent = "0%";
+    queueReviewTimeout(() => {
+      if (token !== uiRuntime.reviewSequenceToken || state.screen !== APP_SCREENS.review) return;
+      if (spec.item) spec.item.classList.add("review-metric-visible");
+      animateMetricRing(spec.ring, spec.value, spec.target, token);
+    }, spec.delay);
+  });
+
+  if (ui.reviewMomentsTitle) {
+    ui.reviewMomentsTitle.classList.add("hidden");
+    ui.reviewMomentsTitle.classList.remove("review-moments-title-visible");
+  }
+  const highlightCards = Array.from(ui.reviewHighlightsList ? ui.reviewHighlightsList.querySelectorAll(".review-moment-card") : []);
+  highlightCards.forEach((card) => card.classList.remove("review-moment-visible"));
+  if (ui.reviewFinalMessageText) {
+    ui.reviewFinalMessageText.classList.add("hidden");
+    ui.reviewFinalMessageText.classList.remove("review-final-message-visible");
+  }
+
+  const highlightsStartDelay = 2600;
+  queueReviewTimeout(() => {
+    if (token !== uiRuntime.reviewSequenceToken || state.screen !== APP_SCREENS.review) return;
+    if (ui.reviewMomentsTitle) {
+      ui.reviewMomentsTitle.classList.remove("hidden");
+      ui.reviewMomentsTitle.classList.add("review-moments-title-visible");
+    }
+    highlightCards.forEach((card, index) => {
+      queueReviewTimeout(() => {
+        if (token !== uiRuntime.reviewSequenceToken || state.screen !== APP_SCREENS.review) return;
+        card.classList.add("review-moment-visible");
+      }, index * 260);
+    });
+    const finalDelay = highlightCards.length * 260 + 520;
+    queueReviewTimeout(() => {
+      if (token !== uiRuntime.reviewSequenceToken || state.screen !== APP_SCREENS.review) return;
+      if (ui.reviewFinalMessageText) {
+        ui.reviewFinalMessageText.classList.remove("hidden");
+        ui.reviewFinalMessageText.classList.add("review-final-message-visible");
+      }
+    }, finalDelay);
+  }, highlightsStartDelay);
+}
+
+function handleScreenTransitionAnimations() {
+  const previous = uiRuntime.lastScreen;
+  const current = state.screen;
+  if (previous === current) return;
+  uiRuntime.lastScreen = current;
+  if (previous === APP_SCREENS.result) clearResultRevealTimers();
+  if (previous === APP_SCREENS.review) clearReviewSequenceTimers();
+  if (current === APP_SCREENS.result) startResultRevealSequence();
+  if (current === APP_SCREENS.review) startReviewRevealSequence();
+}
+
+function buildCaptureNodeFromReviewCard() {
+  const source = ui.reviewScreen ? ui.reviewScreen.querySelector(".review-card") : null;
+  if (!(source instanceof HTMLElement)) return null;
+  if (state.screen === APP_SCREENS.review) return { node: source, cleanup: null };
+  const clone = source.cloneNode(true);
+  if (!(clone instanceof HTMLElement)) return null;
+  clone.classList.add("share-capture-clone");
+  document.body.appendChild(clone);
+  return {
+    node: clone,
+    cleanup: () => {
+      clone.remove();
+    }
+  };
+}
+
+function prepareReviewNodeForCapture(node) {
+  if (!(node instanceof HTMLElement)) return;
+  node.querySelectorAll("[data-review-metric]").forEach((metricNode) => metricNode.classList.add("review-metric-visible"));
+  node.querySelectorAll(".review-ring").forEach((ringNode) => {
+    const target = clamp(Number(ringNode.getAttribute("data-target")) || 0, 0, 100);
+    ringNode.style.setProperty("--progress", `${target}`);
+  });
+  node.querySelectorAll(".review-ring-value").forEach((valueNode) => {
+    const ringNode = valueNode.closest(".review-ring");
+    const target = ringNode ? clamp(Number(ringNode.getAttribute("data-target")) || 0, 0, 100) : 0;
+    valueNode.textContent = `${target}%`;
+  });
+  const title = node.querySelector("#reviewMomentsTitle, .review-moments-title");
+  if (title instanceof HTMLElement) {
+    title.classList.remove("hidden");
+    title.classList.add("review-moments-title-visible");
+  }
+  node.querySelectorAll(".review-moment-card").forEach((cardNode) => cardNode.classList.add("review-moment-visible"));
+  const finalNode = node.querySelector("#reviewFinalMessageText, .review-final-message");
+  if (finalNode instanceof HTMLElement) {
+    finalNode.classList.remove("hidden");
+    finalNode.classList.add("review-final-message-visible");
+  }
+}
+
+async function shareReviewHighlightImage() {
+  ensurePostGameReviewReady();
+  const capture = buildCaptureNodeFromReviewCard();
+  if (!capture || !(capture.node instanceof HTMLElement) || typeof window.html2canvas !== "function") {
+    showActionToast("Sharing coming soon.");
+    return;
+  }
+  try {
+    prepareReviewNodeForCapture(capture.node);
+    const canvas = await window.html2canvas(capture.node, {
+      useCORS: true,
+      backgroundColor: "#1f1f1e",
+      scale: Math.max(2, Math.floor(window.devicePixelRatio || 2))
+    });
+    const link = document.createElement("a");
+    link.download = "gambit-liars-highlight.png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  } catch (_error) {
+    showActionToast("Sharing coming soon.");
+  } finally {
+    if (capture.cleanup) capture.cleanup();
+  }
 }
 
 function runResolutionAfterDelay(applyFn) {
@@ -5959,6 +6245,7 @@ function updateUI() {
   renderAvatar(ui.resultLocalAvatar, state.slots[localSlot].heroId);
   renderAvatar(ui.resultOpponentAvatar, state.slots[opponentSlot].heroId);
   renderPostGameReview();
+  handleScreenTransitionAnimations();
   syncGameEventTooltip();
   syncHeroTooltip();
 }
@@ -6781,7 +7068,7 @@ function bindEvents() {
     await backToMenu();
   });
   ui.shareResultBtn.addEventListener("click", () => {
-    showActionToast("Share coming soon");
+    void shareReviewHighlightImage();
   });
   if (ui.openGameReviewBtn) {
     ui.openGameReviewBtn.addEventListener("click", () => {
@@ -6792,7 +7079,7 @@ function bindEvents() {
   }
   if (ui.reviewShareBtn) {
     ui.reviewShareBtn.addEventListener("click", () => {
-      showActionToast("Sharing coming soon.");
+      void shareReviewHighlightImage();
     });
   }
   if (ui.reviewPlayAgainBtn) {
@@ -7185,11 +7472,19 @@ function cacheElements() {
   ui.playAgainBtn = document.getElementById("playAgainBtn");
   ui.backToMenuBtn = document.getElementById("backToMenuBtn");
   ui.openGameReviewBtn = document.getElementById("openGameReviewBtn");
+  ui.resultReviewCtaWrap = document.getElementById("resultReviewCtaWrap");
+  ui.resultReviewBadge = document.getElementById("resultReviewBadge");
+  ui.resultBottomActions = document.getElementById("resultBottomActions");
+  ui.reviewBluffRing = document.getElementById("reviewBluffRing");
+  ui.reviewChallengeRing = document.getElementById("reviewChallengeRing");
+  ui.reviewOptimalRing = document.getElementById("reviewOptimalRing");
   ui.reviewBluffRateText = document.getElementById("reviewBluffRateText");
   ui.reviewChallengeAccuracyText = document.getElementById("reviewChallengeAccuracyText");
   ui.reviewOptimalDecisionsText = document.getElementById("reviewOptimalDecisionsText");
   ui.reviewFeedbackText = document.getElementById("reviewFeedbackText");
   ui.reviewHighlightsList = document.getElementById("reviewHighlightsList");
+  ui.reviewMomentsTitle = document.getElementById("reviewMomentsTitle");
+  ui.reviewFinalMessageText = document.getElementById("reviewFinalMessageText");
   ui.reviewShareBtn = document.getElementById("reviewShareBtn");
   ui.reviewPlayAgainBtn = document.getElementById("reviewPlayAgainBtn");
   ui.reviewBackToMenuBtn = document.getElementById("reviewBackToMenuBtn");

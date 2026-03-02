@@ -228,10 +228,17 @@
           </div>
         </div>
         <div class="result-actions">
-          <button id="playAgainBtn" class="btn mode-btn" type="button">Play Again</button>
-          <button id="openGameReviewBtn" class="btn btn-primary mode-btn" type="button">Game Review</button>
-          <button id="shareResultBtn" class="btn" type="button">Share</button>
-          <button id="backToMenuBtn" class="btn" type="button">Back to Menu</button>
+          <button id="playAgainBtn" class="btn mode-btn hidden" type="button">Play Again</button>
+          <div id="resultReviewCtaWrap" class="result-review-cta-wrap">
+            <p id="resultReviewBadge" class="result-review-badge hidden">Brilliant Bluff!</p>
+            <button id="openGameReviewBtn" class="btn btn-primary mode-btn result-review-btn hidden" type="button">Game Review</button>
+          </div>
+          <div id="resultBottomActions" class="result-bottom-actions hidden">
+            <button id="backToMenuBtn" class="btn result-bottom-btn" type="button">Back to Menu</button>
+            <button id="shareResultBtn" class="btn share-icon-btn" type="button" aria-label="Share result highlight" title="Share">
+              <span aria-hidden="true">&#10150;</span>
+            </button>
+          </div>
         </div>
         <p class="result-site">Play free at liar-s-clash.vercel.app</p>
       </div>
@@ -240,32 +247,45 @@
     <section id="reviewScreen" class="screen" aria-label="Post Game Review">
       <div class="screen-card review-card">
         <h2 class="section-title">Post Game Review</h2>
-
-        <section class="review-summary-block" aria-label="Review summary">
-          <div class="review-stat-row">
-            <p class="review-stat-label">Bluff Success Rate</p>
-            <p id="reviewBluffRateText" class="review-stat-value">0%</p>
+        <section class="review-metrics-block" aria-label="Performance metrics">
+          <div class="review-metrics-grid">
+            <div class="review-metric-item" data-review-metric="bluff">
+              <div id="reviewBluffRing" class="review-ring" style="--progress: 0">
+                <span id="reviewBluffRateText" class="review-ring-value">0%</span>
+              </div>
+              <p class="review-metric-label">Bluff Success</p>
+            </div>
+            <div class="review-metric-item" data-review-metric="challenge">
+              <div id="reviewChallengeRing" class="review-ring" style="--progress: 0">
+                <span id="reviewChallengeAccuracyText" class="review-ring-value">0%</span>
+              </div>
+              <p class="review-metric-label">Challenge Accuracy</p>
+            </div>
+            <div class="review-metric-item" data-review-metric="optimal">
+              <div id="reviewOptimalRing" class="review-ring" style="--progress: 0">
+                <span id="reviewOptimalDecisionsText" class="review-ring-value">0%</span>
+              </div>
+              <p class="review-metric-label">Optimal Decisions</p>
+            </div>
           </div>
-          <div class="review-stat-row">
-            <p class="review-stat-label">Challenge Accuracy</p>
-            <p id="reviewChallengeAccuracyText" class="review-stat-value">0%</p>
-          </div>
-          <div class="review-stat-row">
-            <p class="review-stat-label">Optimal Decisions</p>
-            <p id="reviewOptimalDecisionsText" class="review-stat-value">0%</p>
-          </div>
-          <p id="reviewFeedbackText" class="review-feedback-text">You made smart plays and strong reads.</p>
         </section>
 
         <section class="review-moments-block" aria-label="Highlighted moments">
-          <h3 class="panel-subtitle review-moments-title">Highlighted Moments</h3>
+          <h3 id="reviewMomentsTitle" class="panel-subtitle review-moments-title">HIGHLIGHTED MOMENTS</h3>
           <div id="reviewHighlightsList" class="review-moments-list"></div>
         </section>
 
+        <p id="reviewFeedbackText" class="review-feedback-text">You made smart plays and strong reads.</p>
+        <p id="reviewFinalMessageText" class="review-final-message hidden">Psychological victory.</p>
+
         <div class="result-actions">
-          <button id="reviewShareBtn" class="btn btn-secondary mode-btn" type="button">Share Highlight</button>
           <button id="reviewPlayAgainBtn" class="btn mode-btn" type="button">Play Again</button>
-          <button id="reviewBackToMenuBtn" class="btn mode-btn" type="button">Back to Menu</button>
+          <div class="result-bottom-actions">
+            <button id="reviewBackToMenuBtn" class="btn result-bottom-btn" type="button">Back to Menu</button>
+            <button id="reviewShareBtn" class="btn share-icon-btn" type="button" aria-label="Share review highlight" title="Share">
+              <span aria-hidden="true">&#10150;</span>
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -491,6 +511,7 @@ STRIKE -> 1 damage (2 Gold)
   </section>
 
   <script src="supabase-public-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
