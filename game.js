@@ -1984,6 +1984,19 @@ function appendText(node, text) {
 
 function renderRoleDescription(node, role, card = null) {
   if (!node) return;
+  node.textContent = "";
+  node.classList.remove("card-desc-adept");
+  if (role === "APPRENTICE") {
+    const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+    node.classList.add("card-desc-adept");
+    appendText(node, `${dmg} ⚔ · `);
+    const upArrow = document.createElement("span");
+    upArrow.className = "card-desc-up-arrow";
+    upArrow.textContent = "↑";
+    node.appendChild(upArrow);
+    appendText(node, " each round");
+    return;
+  }
   node.textContent = getRoleEffectSummary(role, card);
 }
 
@@ -2662,6 +2675,10 @@ function getRoleCost(role, card) {
 }
 
 function getRoleEffectSummary(role, card) {
+  if (role === "APPRENTICE") {
+    const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+    return `${dmg} ⚔ · ↑ each round`;
+  }
   const meta = getRoleMeta(role);
   return meta ? String(meta.description || "") : "";
 }
@@ -5795,15 +5812,6 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
     verifiedTag.className = `card-badge card-status-tag ${verifiedIsReal ? "card-real-tag" : "card-fake-tag"}`;
     verifiedTag.textContent = verifiedIsReal ? "REAL" : "BLUFF";
     badgeLeft.appendChild(verifiedTag);
-    hasBadge = true;
-  }
-
-  if (!hideOpponentCardDetails && card.role === "APPRENTICE") {
-    const dmg = clamp(typeof card.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
-    const damageBadge = document.createElement("span");
-    damageBadge.className = "card-badge card-damage";
-    damageBadge.textContent = `${dmg} ⚔`;
-    badgeLeft.appendChild(damageBadge);
     hasBadge = true;
   }
 

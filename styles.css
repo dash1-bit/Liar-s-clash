@@ -1646,6 +1646,20 @@ body {
   max-height: 2.35em;
 }
 
+.card-desc-adept {
+  display: block;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 1.2em;
+}
+
+.card-desc-up-arrow {
+  color: #81b64c;
+}
+
 .card-badge-row {
   position: absolute;
   top: 4px;
@@ -1706,12 +1720,6 @@ body {
 .card-uses {
   background: rgba(45, 45, 45, 0.86);
   color: #f3f3f3;
-}
-
-.card-damage {
-  background: rgba(151, 38, 38, 0.9);
-  color: #fff5f5;
-  border-color: rgba(255, 170, 170, 0.52);
 }
 
 .card-status-tag {
