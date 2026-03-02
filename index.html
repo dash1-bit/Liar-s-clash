@@ -12,53 +12,62 @@
 <body>
   <div id="appRoot" class="app-root">
     <section id="homeScreen" class="screen screen-with-tabs active" aria-label="Home">
-      <header class="home-topbar">
-        <section class="home-tip-compact" aria-label="Tips">
-          <p id="homeTipText" class="home-tip-text">Bluff early to learn how your opponent reacts.</p>
-          <div id="homeTipDots" class="home-tip-dots" aria-label="Tip indicators"></div>
+      <div class="home-shell">
+        <header class="home-topbar">
+          <section class="home-tip-compact" aria-label="Tips">
+            <p id="homeTipText" class="home-tip-text">Bluff early to learn how your opponent reacts.</p>
+            <div id="homeTipDots" class="home-tip-dots" aria-label="Tip indicators"></div>
+          </section>
+          <div class="home-top-right">
+            <input
+              id="playerNameInput"
+              class="home-name-input"
+              type="text"
+              maxlength="18"
+              value="Matt"
+              autocomplete="off"
+              aria-label="Player Name"
+            />
+            <button id="homeTvBtn" class="home-tv-btn" type="button" aria-label="Open Community">
+              <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                <path d="M12 8a1 1 0 0 1 1 1v2.3l1.7 1a1 1 0 1 1-1 1.7l-2.2-1.3A1 1 0 0 1 11 12V9a1 1 0 0 1 1-1Z"></path>
+                <path d="M12 3a9 9 0 1 1-9 9 1 1 0 1 1 2 0 7 7 0 1 0 2-5l.3.3a1 1 0 1 1-1.4 1.4L3.3 6.4A1 1 0 0 1 3 5.7V3a1 1 0 1 1 2 0v1.1A9 9 0 0 1 12 3Z"></path>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="home-title-block" aria-label="Title">
+          <h1 class="home-mini-title">Gambit Liar's</h1>
+          <p class="home-subtitle">Win the mind game.</p>
         </section>
-        <div class="home-top-right">
-          <input
-            id="playerNameInput"
-            class="home-name-input"
-            type="text"
-            maxlength="18"
-            value="Matt"
-            autocomplete="off"
-            aria-label="Player Name"
-          />
-          <button id="homeTvBtn" class="home-tv-btn" type="button" aria-label="Open TV">
-            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-              <path d="M12 8a1 1 0 0 1 1 1v2.3l1.7 1a1 1 0 1 1-1 1.7l-2.2-1.3A1 1 0 0 1 11 12V9a1 1 0 0 1 1-1Z"></path>
-              <path d="M12 3a9 9 0 1 1-9 9 1 1 0 1 1 2 0 7 7 0 1 0 2-5l.3.3a1 1 0 1 1-1.4 1.4L3.3 6.4A1 1 0 0 1 3 5.7V3a1 1 0 1 1 2 0v1.1A9 9 0 0 1 12 3Z"></path>
-            </svg>
-          </button>
-        </div>
-      </header>
 
-      <h1 class="home-mini-title">Gambit Liar's</h1>
-
-      <button id="leagueBadgeBtn" class="league-badge-btn league-pill-btn" type="button" aria-label="Open League progression">
-        <span class="league-pill-prefix">League:</span>
-        <span id="leagueBadgeText" class="league-badge-text">WOOD III</span>
-        <span id="leagueBadgeDot" class="notify-dot hidden" aria-hidden="true"></span>
-      </button>
-
-      <div class="screen-card home-card">
-        <p class="field-label profile-hero-label">Hero</p>
-        <button id="avatarPreviewBtn" class="avatar-preview" type="button" aria-label="Choose hero">
-          <span id="avatarPreviewDot" class="notify-dot hidden" aria-hidden="true"></span>
-          <span id="avatarPreviewArt" class="avatar-art avatar-1"></span>
-          <span id="avatarPreviewLabel" class="avatar-preview-label">Adventurer</span>
+        <button id="leagueBadgeBtn" class="league-badge-btn league-pill-btn" type="button" aria-label="Open League progression">
+          <span class="league-pill-prefix">LEAGUE:</span>
+          <span id="leagueBadgeText" class="league-badge-text">WOOD III</span>
+          <span id="leagueBadgeDot" class="notify-dot hidden" aria-hidden="true"></span>
         </button>
+
+        <section class="home-hero-card" aria-label="Hero">
+          <p class="field-label profile-hero-label">Hero</p>
+          <button id="avatarPreviewBtn" class="avatar-preview" type="button" aria-label="Choose hero">
+            <span id="avatarPreviewDot" class="notify-dot hidden" aria-hidden="true"></span>
+            <span id="avatarPreviewArt" class="avatar-art avatar-1"></span>
+            <span id="avatarPreviewLabel" class="avatar-preview-label">Adventurer</span>
+          </button>
+        </section>
 
         <button id="homePlayBtn" class="btn btn-primary btn-play-pulse" type="button">PLAY</button>
 
-        <button id="premiumBtn" class="btn btn-premium premium-icon-cta" type="button" aria-label="Open Premium">
-          <span class="premium-icon-inner" aria-hidden="true">
+        <button id="premiumBtn" class="btn btn-premium premium-row-cta" type="button" aria-label="Open Premium">
+          <span class="premium-row-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
               <path d="M4 8.5a1 1 0 0 1 1.7-.7L9 11l2.2-5.6a1 1 0 0 1 1.8 0L15.2 11l3.3-3.2A1 1 0 0 1 20 8.5l-1.8 8.4a1.2 1.2 0 0 1-1.2.9H7a1.2 1.2 0 0 1-1.2-.9L4 8.5Zm3.3 11.4a1 1 0 1 1 0-2h9.4a1 1 0 1 1 0 2H7.3Z"></path>
             </svg>
+          </span>
+          <span class="premium-row-text">
+            <span class="premium-row-title">Premium</span>
+            <span class="premium-row-chevron" aria-hidden="true">&rsaquo;</span>
           </span>
         </button>
       </div>
@@ -83,9 +92,6 @@
     </section>
 
     <section id="tvScreen" class="screen screen-with-tabs" aria-label="TV">
-      <div class="top-row">
-        <button id="tvBackBtn" class="btn btn-back" type="button">Back to Menu</button>
-      </div>
       <div class="screen-card tv-card">
         <h2 class="section-title">TV</h2>
         <p class="helper-text tv-subtitle">Watch mind games live. Learn from the community.</p>
@@ -95,6 +101,18 @@
           <button id="tvTabHistoryBtn" class="tv-tab-btn" type="button" data-tv-tab="history" aria-pressed="false">History</button>
         </div>
         <div id="tvTabContent" class="tv-tab-content" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section id="collectionScreen" class="screen screen-with-tabs" aria-label="Collection">
+      <div class="screen-card collection-screen-card">
+        <h2 class="section-title collection-title">Collection</h2>
+        <div class="collection-tabs" role="tablist" aria-label="Collection tabs">
+          <button class="collection-tab active" type="button" data-collection-tab data-tab="cards" aria-pressed="true">Cards</button>
+          <button class="collection-tab" type="button" data-collection-tab data-tab="heroes" aria-pressed="false">Heroes</button>
+          <button class="collection-tab" type="button" data-collection-tab data-tab="events" aria-pressed="false">Game Events</button>
+        </div>
+        <div id="collectionList" class="collection-list" aria-label="Collection items"></div>
       </div>
     </section>
 
@@ -457,21 +475,6 @@
       <h2 id="firstMatchGuideTitle" class="section-title first-guide-title">This is your HP</h2>
       <p id="firstMatchGuideBody" class="first-guide-body">If it reaches 0, you lose.</p>
       <button id="firstMatchGuideNextBtn" class="btn mode-btn first-guide-next-btn" type="button">Next</button>
-    </div>
-  </section>
-
-  <section id="collectionModal" class="modal-overlay collection-modal hidden" role="dialog" aria-modal="true" aria-label="Collection">
-    <div class="collection-shell">
-      <header class="collection-topbar">
-        <h2 class="section-title collection-title">Collection</h2>
-        <button id="collectionCloseBtn" class="modal-close-btn" type="button" aria-label="Close collection">X</button>
-      </header>
-      <div class="collection-tabs" role="tablist" aria-label="Collection tabs">
-        <button class="collection-tab active" type="button" data-collection-tab data-tab="cards" aria-pressed="true">Cards</button>
-        <button class="collection-tab" type="button" data-collection-tab data-tab="heroes" aria-pressed="false">Heroes</button>
-        <button class="collection-tab" type="button" data-collection-tab data-tab="events" aria-pressed="false">Game Events</button>
-      </div>
-      <div id="collectionList" class="collection-list" aria-label="Collection items"></div>
     </div>
   </section>
 

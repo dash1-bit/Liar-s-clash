@@ -16,6 +16,7 @@ const PHASES = Object.freeze({
 
 const APP_SCREENS = Object.freeze({
   home: "home",
+  collection: "collection",
   mode: "mode",
   tv: "tv",
   friend: "friend",
@@ -6423,6 +6424,7 @@ function openHistoryReviewById(historyId, anchor = null) {
 function updateUI() {
   const map = {
     [APP_SCREENS.home]: ui.homeScreen,
+    [APP_SCREENS.collection]: ui.collectionScreen,
     [APP_SCREENS.mode]: ui.modeScreen,
     [APP_SCREENS.tv]: ui.tvScreen,
     [APP_SCREENS.friend]: ui.friendScreen,
@@ -6437,13 +6439,12 @@ function updateUI() {
     node.classList.toggle("active", state.screen === key);
   });
 
-  const collectionModalOpen = ui.collectionModal instanceof HTMLElement && !ui.collectionModal.classList.contains("hidden");
   const showBottomTabs =
     state.screen === APP_SCREENS.home ||
-    state.screen === APP_SCREENS.tv ||
-    collectionModalOpen;
+    state.screen === APP_SCREENS.collection ||
+    state.screen === APP_SCREENS.tv;
   if (ui.bottomTabBar) ui.bottomTabBar.classList.toggle("hidden", !showBottomTabs);
-  const activeBottomTab = collectionModalOpen ? "collection" : state.screen === APP_SCREENS.tv ? "community" : "home";
+  const activeBottomTab = state.screen === APP_SCREENS.collection ? "collection" : state.screen === APP_SCREENS.tv ? "community" : "home";
   if (ui.collectionBtn) {
     ui.collectionBtn.classList.toggle("is-active", activeBottomTab === "collection");
     ui.collectionBtn.setAttribute("aria-pressed", activeBottomTab === "collection" ? "true" : "false");
@@ -7535,14 +7536,20 @@ function bindEvents() {
   ui.homePlayBtn.addEventListener("click", () => runToModeScreen());
   if (ui.homeTabBtn) {
     ui.homeTabBtn.addEventListener("click", () => {
-      closeModal(ui.collectionModal);
       state.screen = APP_SCREENS.home;
+      updateUI();
+    });
+  }
+  if (ui.collectionBtn) {
+    ui.collectionBtn.addEventListener("click", () => {
+      closeHeroTooltip();
+      closeGameEventTooltip();
+      state.screen = APP_SCREENS.collection;
       updateUI();
     });
   }
   if (ui.communityTabBtn) {
     ui.communityTabBtn.addEventListener("click", () => {
-      closeModal(ui.collectionModal);
       state.screen = APP_SCREENS.tv;
       updateUI();
     });
@@ -7719,18 +7726,7 @@ function bindEvents() {
       advanceFirstMatchGuideOverlay();
     });
   }
-  ui.collectionCloseBtn.addEventListener("click", () => {
-    closeModal(ui.collectionModal);
-    updateUI();
-  });
   ui.leagueProgressCloseBtn.addEventListener("click", () => closeModal(ui.leagueProgressModal));
-  ui.collectionBtn.addEventListener("click", () => {
-    closeHeroTooltip();
-    closeGameEventTooltip();
-    state.screen = APP_SCREENS.home;
-    openModal(ui.collectionModal);
-    updateUI();
-  });
   ui.leagueBadgeBtn.addEventListener("click", () => {
     closeHeroTooltip();
     closeGameEventTooltip();
@@ -7848,12 +7844,6 @@ function bindEvents() {
   bindModalDismiss(ui.avatarModal, ui.avatarModalCloseBtn);
   bindModalDismiss(ui.premiumModal, ui.premiumCloseBtn);
   bindModalDismiss(ui.tvWatchModal, ui.tvWatchModalCloseBtn);
-  bindModalDismiss(ui.collectionModal, ui.collectionCloseBtn);
-  if (ui.collectionModal) {
-    ui.collectionModal.addEventListener("click", (event) => {
-      if (event.target === ui.collectionModal) updateUI();
-    });
-  }
   bindModalDismiss(ui.leagueProgressModal, ui.leagueProgressCloseBtn);
   bindModalDismiss(ui.resetProgressModal, null);
 
@@ -7869,9 +7859,7 @@ function bindEvents() {
       closeHeroTooltip();
       return;
     }
-    const previousModal = modalState.activeModal;
     closeModal();
-    if (previousModal === ui.collectionModal) updateUI();
   });
 
   document.addEventListener("pointerdown", (event) => {
@@ -7909,6 +7897,7 @@ function cacheElements() {
   ui.appRoot = document.getElementById("appRoot");
 
   ui.homeScreen = document.getElementById("homeScreen");
+  ui.collectionScreen = document.getElementById("collectionScreen");
   ui.modeScreen = document.getElementById("modeScreen");
   ui.tvScreen = document.getElementById("tvScreen");
   ui.friendScreen = document.getElementById("friendScreen");
@@ -8003,8 +7992,6 @@ function cacheElements() {
   ui.tutorialCardsRow = document.getElementById("tutorialCardsRow");
   ui.tutorialStepText = document.getElementById("tutorialStepText");
   ui.tutorialNextBtn = document.getElementById("tutorialNextBtn");
-  ui.collectionModal = document.getElementById("collectionModal");
-  ui.collectionCloseBtn = document.getElementById("collectionCloseBtn");
   ui.collectionList = document.getElementById("collectionList");
   ui.collectionTabs = Array.from(document.querySelectorAll("[data-collection-tab]"));
   ui.leagueProgressModal = document.getElementById("leagueProgressModal");
