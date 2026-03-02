@@ -11,22 +11,40 @@
 </head>
 <body>
   <div id="appRoot" class="app-root">
-    <section id="homeScreen" class="screen active" aria-label="Home">
-      <div class="home-hero">
-        <h1 class="app-title app-title--hero">Gambit Liar's</h1>
-        <p class="home-tagline">Win the mind game.</p>
-      </div>
-      <div class="screen-card home-card">
-        <button id="leagueBadgeBtn" class="league-badge-btn" type="button" aria-label="Open League progression">
-          <span class="league-badge-label">League</span>
-          <span id="leagueBadgeText" class="league-badge-text">WOOD III</span>
-          <span id="leagueBadgeDot" class="notify-dot hidden" aria-hidden="true"></span>
-        </button>
-        <button id="collectionBtn" class="btn btn-secondary collection-open-btn" type="button">
-          Collection
-          <span id="collectionBtnDot" class="notify-dot hidden" aria-hidden="true"></span>
-        </button>
+    <section id="homeScreen" class="screen screen-with-tabs active" aria-label="Home">
+      <header class="home-topbar">
+        <section class="home-tip-compact" aria-label="Tips">
+          <p id="homeTipText" class="home-tip-text">Bluff early to learn how your opponent reacts.</p>
+          <div id="homeTipDots" class="home-tip-dots" aria-label="Tip indicators"></div>
+        </section>
+        <div class="home-top-right">
+          <input
+            id="playerNameInput"
+            class="home-name-input"
+            type="text"
+            maxlength="18"
+            value="Matt"
+            autocomplete="off"
+            aria-label="Player Name"
+          />
+          <button id="homeTvBtn" class="home-tv-btn" type="button" aria-label="Open TV">
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path d="M12 8a1 1 0 0 1 1 1v2.3l1.7 1a1 1 0 1 1-1 1.7l-2.2-1.3A1 1 0 0 1 11 12V9a1 1 0 0 1 1-1Z"></path>
+              <path d="M12 3a9 9 0 1 1-9 9 1 1 0 1 1 2 0 7 7 0 1 0 2-5l.3.3a1 1 0 1 1-1.4 1.4L3.3 6.4A1 1 0 0 1 3 5.7V3a1 1 0 1 1 2 0v1.1A9 9 0 0 1 12 3Z"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
 
+      <h1 class="home-mini-title">Gambit Liar's</h1>
+
+      <button id="leagueBadgeBtn" class="league-badge-btn league-pill-btn" type="button" aria-label="Open League progression">
+        <span class="league-pill-prefix">League:</span>
+        <span id="leagueBadgeText" class="league-badge-text">WOOD III</span>
+        <span id="leagueBadgeDot" class="notify-dot hidden" aria-hidden="true"></span>
+      </button>
+
+      <div class="screen-card home-card">
         <p class="field-label profile-hero-label">Hero</p>
         <button id="avatarPreviewBtn" class="avatar-preview" type="button" aria-label="Choose hero">
           <span id="avatarPreviewDot" class="notify-dot hidden" aria-hidden="true"></span>
@@ -34,26 +52,16 @@
           <span id="avatarPreviewLabel" class="avatar-preview-label">Adventurer</span>
         </button>
 
-        <label class="field-label" for="playerNameInput">Player Name</label>
-        <input id="playerNameInput" class="text-input" type="text" maxlength="18" value="Matt" autocomplete="off" />
-
         <button id="homePlayBtn" class="btn btn-primary btn-play-pulse" type="button">PLAY</button>
-        <button id="premiumBtn" class="btn btn-premium" type="button">Become Premium</button>
-        <button id="homeTvBtn" class="btn btn-secondary home-tv-btn" type="button">
-          <span class="btn-inline-icon" aria-hidden="true">
+
+        <button id="premiumBtn" class="btn btn-premium premium-icon-cta" type="button" aria-label="Open Premium">
+          <span class="premium-icon-inner" aria-hidden="true">
             <svg viewBox="0 0 24 24" focusable="false">
-              <path d="M12 8a1 1 0 0 1 1 1v2.3l1.7 1a1 1 0 1 1-1 1.7l-2.2-1.3A1 1 0 0 1 11 12V9a1 1 0 0 1 1-1Z"></path>
-              <path d="M12 3a9 9 0 1 1-9 9 1 1 0 1 1 2 0 7 7 0 1 0 2-5l.3.3a1 1 0 1 1-1.4 1.4L3.3 6.4A1 1 0 0 1 3 5.7V3a1 1 0 1 1 2 0v1.1A9 9 0 0 1 12 3Z"></path>
+              <path d="M4 8.5a1 1 0 0 1 1.7-.7L9 11l2.2-5.6a1 1 0 0 1 1.8 0L15.2 11l3.3-3.2A1 1 0 0 1 20 8.5l-1.8 8.4a1.2 1.2 0 0 1-1.2.9H7a1.2 1.2 0 0 1-1.2-.9L4 8.5Zm3.3 11.4a1 1 0 1 1 0-2h9.4a1 1 0 1 1 0 2H7.3Z"></path>
             </svg>
           </span>
-          TV
         </button>
       </div>
-      <section class="home-tips" aria-label="Tips">
-        <p class="home-tips-title">Tips</p>
-        <p id="homeTipText" class="home-tip-text">Bluff early to learn how your opponent reacts.</p>
-        <div id="homeTipDots" class="home-tip-dots" aria-label="Tip indicators"></div>
-      </section>
     </section>
 
     <section id="modeScreen" class="screen" aria-label="Mode Select">
@@ -74,7 +82,7 @@
       </div>
     </section>
 
-    <section id="tvScreen" class="screen" aria-label="TV">
+    <section id="tvScreen" class="screen screen-with-tabs" aria-label="TV">
       <div class="top-row">
         <button id="tvBackBtn" class="btn btn-back" type="button">Back to Menu</button>
       </div>
@@ -314,6 +322,34 @@
         </div>
       </div>
     </section>
+
+    <nav id="bottomTabBar" class="bottom-tab-bar" aria-label="Primary">
+      <button id="collectionBtn" class="bottom-tab-btn" type="button" aria-label="Open Collection">
+        <span class="bottom-tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M4 3h6a1 1 0 0 1 1 1v6H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm10 0h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-7V4a1 1 0 0 1 1-1ZM4 12h7v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Zm9 0h7a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-6a1 1 0 0 1-1-1v-8Z"></path>
+          </svg>
+        </span>
+        <span class="bottom-tab-label">Collection</span>
+        <span id="collectionBtnDot" class="notify-dot tab-notify-dot hidden" aria-hidden="true"></span>
+      </button>
+      <button id="homeTabBtn" class="bottom-tab-btn is-active" type="button" aria-label="Go to Home">
+        <span class="bottom-tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M12 3.2a1 1 0 0 1 .7.3l8 7.3a1 1 0 0 1-1.4 1.5l-7.3-6.6-7.3 6.6a1 1 0 1 1-1.4-1.5l8-7.3a1 1 0 0 1 .7-.3Zm-5 9.5a1 1 0 0 1 1 1V20h2.8v-3.8a1 1 0 0 1 1-1h2.4a1 1 0 0 1 1 1V20H18v-6.3a1 1 0 1 1 2 0V20a2 2 0 0 1-2 2h-4.8v-4.8h-.4V22H8a2 2 0 0 1-2-2v-6.3a1 1 0 0 1 1-1Z"></path>
+          </svg>
+        </span>
+        <span class="bottom-tab-label">Home</span>
+      </button>
+      <button id="communityTabBtn" class="bottom-tab-btn" type="button" aria-label="Open Community">
+        <span class="bottom-tab-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false">
+            <path d="M7.5 11A3.5 3.5 0 1 1 7.5 4a3.5 3.5 0 0 1 0 7Zm9 0A3.5 3.5 0 1 1 16.5 4a3.5 3.5 0 0 1 0 7ZM3 19.5A4.5 4.5 0 0 1 7.5 15h1a4.5 4.5 0 0 1 4.4 3.5 1 1 0 0 1-1 1.2H4a1 1 0 0 1-1-1Zm11.2.2a4.7 4.7 0 0 0-1.2-2.5A4.5 4.5 0 0 1 15.8 15h1a4.2 4.2 0 0 1 4.2 3.7 1 1 0 0 1-1 1.2h-4.9a1 1 0 0 1-.9-.2Z"></path>
+          </svg>
+        </span>
+        <span class="bottom-tab-label">Community</span>
+      </button>
+    </nav>
   </div>
 
   <section id="responseOverlay" class="response-overlay hidden" role="dialog" aria-modal="true" aria-label="Respond to claim">

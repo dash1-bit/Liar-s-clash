@@ -6329,6 +6329,26 @@ function updateUI() {
     node.classList.toggle("active", state.screen === key);
   });
 
+  const collectionModalOpen = ui.collectionModal instanceof HTMLElement && !ui.collectionModal.classList.contains("hidden");
+  const showBottomTabs =
+    state.screen === APP_SCREENS.home ||
+    state.screen === APP_SCREENS.tv ||
+    collectionModalOpen;
+  if (ui.bottomTabBar) ui.bottomTabBar.classList.toggle("hidden", !showBottomTabs);
+  const activeBottomTab = collectionModalOpen ? "collection" : state.screen === APP_SCREENS.tv ? "community" : "home";
+  if (ui.collectionBtn) {
+    ui.collectionBtn.classList.toggle("is-active", activeBottomTab === "collection");
+    ui.collectionBtn.setAttribute("aria-pressed", activeBottomTab === "collection" ? "true" : "false");
+  }
+  if (ui.homeTabBtn) {
+    ui.homeTabBtn.classList.toggle("is-active", activeBottomTab === "home");
+    ui.homeTabBtn.setAttribute("aria-pressed", activeBottomTab === "home" ? "true" : "false");
+  }
+  if (ui.communityTabBtn) {
+    ui.communityTabBtn.classList.toggle("is-active", activeBottomTab === "community");
+    ui.communityTabBtn.setAttribute("aria-pressed", activeBottomTab === "community" ? "true" : "false");
+  }
+
   ui.playerNameInput.value = String(state.profile.name || "");
   ensureSelectedHeroUnlocked();
   ui.avatarPreviewLabel.textContent = getAvatarMeta(state.profile.heroId).displayName;
@@ -7401,6 +7421,20 @@ function handlePlayAgain() {
 
 function bindEvents() {
   ui.homePlayBtn.addEventListener("click", () => runToModeScreen());
+  if (ui.homeTabBtn) {
+    ui.homeTabBtn.addEventListener("click", () => {
+      closeModal(ui.collectionModal);
+      state.screen = APP_SCREENS.home;
+      updateUI();
+    });
+  }
+  if (ui.communityTabBtn) {
+    ui.communityTabBtn.addEventListener("click", () => {
+      closeModal(ui.collectionModal);
+      state.screen = APP_SCREENS.tv;
+      updateUI();
+    });
+  }
   if (ui.homeTvBtn) {
     ui.homeTvBtn.addEventListener("click", () => {
       state.screen = APP_SCREENS.tv;
@@ -7573,11 +7607,15 @@ function bindEvents() {
       advanceFirstMatchGuideOverlay();
     });
   }
-  ui.collectionCloseBtn.addEventListener("click", () => closeModal(ui.collectionModal));
+  ui.collectionCloseBtn.addEventListener("click", () => {
+    closeModal(ui.collectionModal);
+    updateUI();
+  });
   ui.leagueProgressCloseBtn.addEventListener("click", () => closeModal(ui.leagueProgressModal));
   ui.collectionBtn.addEventListener("click", () => {
     closeHeroTooltip();
     closeGameEventTooltip();
+    state.screen = APP_SCREENS.home;
     openModal(ui.collectionModal);
     updateUI();
   });
@@ -7699,6 +7737,11 @@ function bindEvents() {
   bindModalDismiss(ui.premiumModal, ui.premiumCloseBtn);
   bindModalDismiss(ui.tvWatchModal, ui.tvWatchModalCloseBtn);
   bindModalDismiss(ui.collectionModal, ui.collectionCloseBtn);
+  if (ui.collectionModal) {
+    ui.collectionModal.addEventListener("click", (event) => {
+      if (event.target === ui.collectionModal) updateUI();
+    });
+  }
   bindModalDismiss(ui.leagueProgressModal, ui.leagueProgressCloseBtn);
   bindModalDismiss(ui.resetProgressModal, null);
 
@@ -7714,7 +7757,9 @@ function bindEvents() {
       closeHeroTooltip();
       return;
     }
+    const previousModal = modalState.activeModal;
     closeModal();
+    if (previousModal === ui.collectionModal) updateUI();
   });
 
   document.addEventListener("pointerdown", (event) => {
@@ -7765,8 +7810,11 @@ function cacheElements() {
   ui.leagueBadgeBtn = document.getElementById("leagueBadgeBtn");
   ui.leagueBadgeText = document.getElementById("leagueBadgeText");
   ui.leagueBadgeDot = document.getElementById("leagueBadgeDot");
+  ui.bottomTabBar = document.getElementById("bottomTabBar");
   ui.collectionBtn = document.getElementById("collectionBtn");
   ui.collectionBtnDot = document.getElementById("collectionBtnDot");
+  ui.homeTabBtn = document.getElementById("homeTabBtn");
+  ui.communityTabBtn = document.getElementById("communityTabBtn");
   ui.homeTipText = document.getElementById("homeTipText");
   ui.homeTipDots = document.getElementById("homeTipDots");
   ui.homeTvBtn = document.getElementById("homeTvBtn");
