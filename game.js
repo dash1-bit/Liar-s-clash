@@ -47,7 +47,7 @@ const ROLE_CONFIG = Object.freeze({
   KNIGHT: Object.freeze({ name: "KNIGHT", cost: 2, description: "2 DMG", passive: false }),
   GOBLIN: Object.freeze({ name: "GOBLIN", cost: 0, description: "Steal 1 Gold", maxUses: 3, passive: false }),
   ENT: Object.freeze({ name: "ENT", cost: 2, description: "+2 HP", passive: false }),
-  ELF: Object.freeze({ name: "ELF", cost: 0, description: "+2 Gold on catch lie", passive: true }),
+  ELF: Object.freeze({ name: "ELF", cost: 2, description: "1 DMG. Increase cost of a random enemy card by +1", passive: false }),
   PIRATE: Object.freeze({ name: "PIRATE", cost: 0, description: "1 DMG +1 Gold", maxUses: 2, passive: false }),
   SCIENTIST: Object.freeze({ name: "SCIENTIST", cost: 0, description: "+1 Gold + reveal unknown card", maxUses: 2, passive: false }),
   JOKER: Object.freeze({ name: "JOKER", cost: 1, description: "1 DMG then transform", passive: false }),
@@ -304,7 +304,7 @@ const ROLE_COLLECTION_META = Object.freeze({
   KNIGHT: Object.freeze({ name: "Knight", description: "Deal 2 damage." }),
   GOBLIN: Object.freeze({ name: "Goblin", description: "Steal 1 Gold (max 3 uses)." }),
   ENT: Object.freeze({ name: "Ent", description: "Heal 2 HP." }),
-  ELF: Object.freeze({ name: "Elf", description: "Passive: +2 Gold when you catch a lie." }),
+  ELF: Object.freeze({ name: "Elf", description: "1 DMG. Increase cost of a random enemy card by +1." }),
   PIRATE: Object.freeze({ name: "Pirate", description: "Deal 1 damage and gain 1 Gold." }),
   SCIENTIST: Object.freeze({ name: "Scientist", description: "Gain 1 Gold and reveal one unknown opponent card." }),
   JOKER: Object.freeze({ name: "Joker", description: "Deal 1 damage, then transform into another card." }),
@@ -539,7 +539,7 @@ const RULES_ROLE_DETAILS = Object.freeze([
   Object.freeze({ role: "GOBLIN", text: "Steal 1 Gold (max 3)" }),
   Object.freeze({ role: "ENT", text: "Heal 2 HP (2 Gold)" }),
   Object.freeze({ role: "PIRATE", text: "1 damage +1 Gold (max 2)" }),
-  Object.freeze({ role: "ELF", text: "Passive +2 Gold on catch lie" }),
+  Object.freeze({ role: "ELF", text: "1 damage + random enemy card cost +1 (2 Gold)" }),
   Object.freeze({ role: "SCIENTIST", text: "+1 Gold + reveal one unknown card (max 2)" }),
   Object.freeze({ role: "JOKER", text: "1 damage (1 Gold), then transforms" }),
   Object.freeze({ role: "BERSERK", text: "Self -1 HP, enemy -2 HP" }),
@@ -2000,9 +2000,9 @@ function renderRoleDescription(node, role, card = null) {
       icon("hp");
       break;
     case "ELF":
-      appendText(node, "+2 ");
-      icon("gold");
-      appendText(node, " on catch lie");
+      appendText(node, "1 ");
+      icon("sword");
+      appendText(node, ". Increase cost of a random enemy card by +1");
       break;
     case "PIRATE":
       appendText(node, "1 ");
@@ -2512,6 +2512,7 @@ function normalizeDraftSelectionIndices(indices) {
 
 function applyCardRoleDefaults(card, role) {
   if (!card) return;
+  card.costModifier = Math.max(0, Number(card.costModifier) || 0);
   if (role === "APPRENTICE") {
     card.apprenticeDamage = typeof card.apprenticeDamage === "number" ? clamp(card.apprenticeDamage, 1, 5) : 1;
     card.apprenticeCost = typeof card.apprenticeCost === "number" ? clamp(card.apprenticeCost, 2, 6) : 2;
@@ -2530,7 +2531,8 @@ function createCard(role, isReal, index) {
     confirmed: false,
     verification: null,
     apprenticeDamage: null,
-    apprenticeCost: null
+    apprenticeCost: null,
+    costModifier: 0
   };
   applyCardRoleDefaults(card, role);
   return card;
@@ -2656,7 +2658,8 @@ function applyLoadoutToPlayer(playerKey, loadout) {
           confirmed: verification === "REAL",
           verification,
           apprenticeDamage: typeof card.apprenticeDamage === "number" ? card.apprenticeDamage : null,
-          apprenticeCost: typeof card.apprenticeCost === "number" ? card.apprenticeCost : null
+          apprenticeCost: typeof card.apprenticeCost === "number" ? card.apprenticeCost : null,
+          costModifier: Math.max(0, Number(card.costModifier) || 0)
         };
       })
     : [];
@@ -2716,15 +2719,20 @@ function getCardByIndex(playerKey, cardIndex) {
 }
 
 function getRoleCost(role, card) {
-  if (role === "APPRENTICE") return clamp(typeof card?.apprenticeCost === "number" ? card.apprenticeCost : 2, 2, 6);
   const meta = getRoleMeta(role);
-  return meta ? meta.cost : 0;
+  const baseCost = role === "APPRENTICE"
+    ? clamp(typeof card?.apprenticeCost === "number" ? card.apprenticeCost : 2, 2, 6)
+    : meta
+      ? meta.cost
+      : 0;
+  const modifier = Math.max(0, Number(card?.costModifier) || 0);
+  return baseCost + modifier;
 }
 
 function getRoleEffectSummary(role, card) {
   if (role === "APPRENTICE") {
     const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
-    const cost = clamp(typeof card?.apprenticeCost === "number" ? card.apprenticeCost : 2, 2, 6);
+    const cost = getRoleCost(role, card);
     return `${dmg} DMG (cost ${cost})`;
   }
   const meta = getRoleMeta(role);
@@ -2753,6 +2761,28 @@ function chooseScientistRevealIndex(targetKey, actorKey, cardIndex) {
     `scientist:${actorKey}:${targetKey}:${state.round}:${state.roundActionCounter}:${cardIndex}:${actorUses}`
   );
   return pick >= 0 ? unknown[pick] : unknown[0];
+}
+
+function chooseElfTaxTargetIndex(targetKey, actorKey, cardIndex) {
+  const targetCards = state.players[targetKey].cards || [];
+  if (targetCards.length === 0) return null;
+  const actorUses = state.players[actorKey].roleUses.ELF || 0;
+  const pick = deterministicPickIndex(
+    targetCards.length,
+    `elf:${actorKey}:${targetKey}:${state.round}:${state.roundActionCounter}:${cardIndex}:${actorUses}`
+  );
+  return pick >= 0 ? pick : 0;
+}
+
+function applyElfCostIncrease(actorKey, targetKey, cardIndex) {
+  const targetCards = state.players[targetKey].cards || [];
+  const targetIndex = chooseElfTaxTargetIndex(targetKey, actorKey, cardIndex);
+  if (targetIndex === null) return;
+  const targetCard = targetCards[targetIndex];
+  if (!targetCard) return;
+  const targetMeta = getRoleMeta(targetCard.role);
+  if (targetMeta && targetMeta.passive) return;
+  targetCard.costModifier = Math.max(0, Number(targetCard.costModifier) || 0) + 1;
 }
 
 function revealCardVerification(targetKey, cardIndex, sourceLabel) {
@@ -4856,12 +4886,6 @@ function markRoleReveal(playerKey, cardIndex, verification = null) {
   card.confirmed = card.verification === "REAL";
 }
 
-function playerHasRealRole(playerKey, role) {
-  const player = state.players[playerKey];
-  if (!player || !Array.isArray(player.cards)) return false;
-  return player.cards.some((card) => card && card.isReal && card.role === role);
-}
-
 function resolveAccept() {
   if (state.phase !== PHASES.awaitingResponse) return;
   clearFirstMatchDecisionGuideDelay();
@@ -4935,7 +4959,6 @@ function resolveChallenge() {
       applyEffect(pending);
     } else {
       applyDamage(result.actor, 2, "bluff penalty");
-      if (playerHasRealRole(result.challenger, "ELF")) applyGold(result.challenger, 2, "ELF catch lie bonus");
     }
 
     finalizeReviewEntry(pending.reviewEntryId);
@@ -4974,6 +4997,10 @@ function applyEffect(action) {
     }
     case "ENT":
       applyHeal(actor, 2, "ENT");
+      break;
+    case "ELF":
+      applyDamage(target, 1, "ELF");
+      applyElfCostIncrease(actor, target, action.cardIndex);
       break;
     case "PIRATE":
       applyDamage(target, 1, "PIRATE");
