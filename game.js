@@ -17,6 +17,7 @@ const PHASES = Object.freeze({
 const APP_SCREENS = Object.freeze({
   home: "home",
   mode: "mode",
+  tv: "tv",
   friend: "friend",
   waiting: "waiting",
   game: "game",
@@ -360,6 +361,52 @@ const REVIEW_FINAL_MESSAGES = Object.freeze([
   "You outplayed the bluff war."
 ]);
 
+const MATCH_HISTORY_STORAGE_KEY = "liarsClashMatchHistoryV1";
+const TV_TABS = Object.freeze(["live", "highlights", "history"]);
+
+const TV_COMMUNITY_MATCHES = Object.freeze([
+  Object.freeze({ id: "comm-1", result: "WIN", opponentName: "Hikaru", opponentHeroId: "noble", highlightLine: "Brilliant Catch on Knight bluff." }),
+  Object.freeze({
+    id: "comm-2",
+    result: "LOSS",
+    opponentName: "MrBeast",
+    opponentHeroId: "rogue",
+    highlightLine: "Risky Angel swap backfired."
+  }),
+  Object.freeze({
+    id: "comm-3",
+    result: "WIN",
+    opponentName: "Danny",
+    opponentHeroId: "adventurer",
+    highlightLine: "Perfect read in the final round."
+  }),
+  Object.freeze({ id: "comm-4", result: "WIN", opponentName: "Sasha", opponentHeroId: "oracle", highlightLine: "Caught a turn-6 BLUFF instantly." }),
+  Object.freeze({ id: "comm-5", result: "LOSS", opponentName: "Lena", opponentHeroId: "guardian", highlightLine: "Shield timing shut down the comeback." }),
+  Object.freeze({ id: "comm-6", result: "WIN", opponentName: "Noah", opponentHeroId: "noble", highlightLine: "Cold-blood bluff at 1 HP." }),
+  Object.freeze({ id: "comm-7", result: "WIN", opponentName: "Ava", opponentHeroId: "adventurer", highlightLine: "Mind game masterclass on turn 8." }),
+  Object.freeze({ id: "comm-8", result: "LOSS", opponentName: "Kai", opponentHeroId: "rogue", highlightLine: "Rogue swap created a perfect trap." }),
+  Object.freeze({ id: "comm-9", result: "WIN", opponentName: "Mina", opponentHeroId: "oracle", highlightLine: "Perfect bluff chain in midgame." }),
+  Object.freeze({ id: "comm-10", result: "LOSS", opponentName: "Omar", opponentHeroId: "guardian", highlightLine: "Late challenge missed by one read." })
+]);
+
+const TV_LIVE_MATCHES = Object.freeze([
+  Object.freeze({ id: "live-1", playerA: "Hikaru", heroA: "noble", playerB: "Matt", heroB: "adventurer", league: "Bronze" }),
+  Object.freeze({ id: "live-2", playerA: "Danny", heroA: "adventurer", playerB: "Lena", heroB: "guardian", league: "Stone" }),
+  Object.freeze({ id: "live-3", playerA: "MrBeast", heroA: "rogue", playerB: "Noah", heroB: "noble", league: "Bronze" }),
+  Object.freeze({ id: "live-4", playerA: "Sasha", heroA: "oracle", playerB: "Ava", heroB: "adventurer", league: "Stone" }),
+  Object.freeze({ id: "live-5", playerA: "Kai", heroA: "rogue", playerB: "Mina", heroB: "oracle", league: "Wood" }),
+  Object.freeze({ id: "live-6", playerA: "Omar", heroA: "guardian", playerB: "Danny", heroB: "adventurer", league: "Wood" })
+]);
+
+const TV_HIGHLIGHTS = Object.freeze([
+  Object.freeze({ id: "hl-1", title: "Brilliant Catch!", matchup: "Matt vs Hikaru", line: "Caught a Knight bluff on Turn 9." }),
+  Object.freeze({ id: "hl-2", title: "Perfect Bluff!", matchup: "Danny vs Lena", line: "Sold a Goblin lie with zero tells." }),
+  Object.freeze({ id: "hl-3", title: "Epic Comeback!", matchup: "Ava vs Noah", line: "Recovered from 1 HP to close it out." }),
+  Object.freeze({ id: "hl-4", title: "Mind Game Masterclass", matchup: "Sasha vs Kai", line: "Three reads in a row flipped the match." }),
+  Object.freeze({ id: "hl-5", title: "Brilliant Catch!", matchup: "Mina vs MrBeast", line: "Sniped a late BLUFF in round 10." }),
+  Object.freeze({ id: "hl-6", title: "Perfect Bluff!", matchup: "Omar vs Matt", line: "Risky BLUFF landed under pressure." })
+]);
+
 const FIRST_MATCH_GUIDE_STEPS = Object.freeze([
   Object.freeze({
     id: "welcome",
@@ -518,6 +565,7 @@ const uiRuntime = {
   reviewSequenceToken: 0,
   reviewSequenceTimerIds: [],
   reviewMetricAnimationIds: [],
+  inlineHintTimerId: null,
   lastScreen: null
 };
 const modalState = { activeModal: null };
@@ -528,6 +576,8 @@ const state = {
   profile: { name: "Matt", heroId: "adventurer", ranking: 1000, opponentRanking: 1000 },
   progression: createDefaultProgressionState(),
   collection: { tab: "cards" },
+  tv: { tab: "live" },
+  matchHistory: [],
   home: { tipIndex: 0 },
   friend: {
     roomId: "",
@@ -1257,6 +1307,85 @@ function persistProgressionState() {
   } catch (_error) {
     // Ignore storage write failures for demo build.
   }
+}
+
+function normalizeHistoryResult(result) {
+  const normalized = String(result || "").toUpperCase();
+  if (normalized === "WIN" || normalized === "LOSS" || normalized === "DRAW") return normalized;
+  return "DRAW";
+}
+
+function normalizeMatchHistoryEntry(entry, index = 0) {
+  if (!entry || typeof entry !== "object") return null;
+  const opponentHeroId = normalizeHeroId(entry.opponentHeroId || "adventurer");
+  return {
+    id: String(entry.id || `hist-${Date.now()}-${index}`),
+    timestamp: String(entry.timestamp || new Date().toISOString()),
+    opponentName: safePlayerName(entry.opponentName || "Opponent"),
+    opponentHeroId,
+    result: normalizeHistoryResult(entry.result),
+    localHp: Math.max(0, Number(entry.localHp) || 0),
+    localGold: Math.max(0, Number(entry.localGold) || 0),
+    opponentHp: Math.max(0, Number(entry.opponentHp) || 0),
+    opponentGold: Math.max(0, Number(entry.opponentGold) || 0),
+    highlightLine: String(entry.highlightLine || ""),
+    reviewSnapshot: entry.reviewSnapshot && typeof entry.reviewSnapshot === "object" ? entry.reviewSnapshot : null
+  };
+}
+
+function loadMatchHistoryFromStorage() {
+  try {
+    const raw = window.localStorage.getItem(MATCH_HISTORY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry, index) => normalizeMatchHistoryEntry(entry, index))
+      .filter(Boolean)
+      .slice(0, 10);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function persistMatchHistory() {
+  try {
+    const safeHistory = Array.isArray(state.matchHistory) ? state.matchHistory.slice(0, 10) : [];
+    window.localStorage.setItem(MATCH_HISTORY_STORAGE_KEY, JSON.stringify(safeHistory));
+  } catch (_error) {
+    // Ignore storage write failures in demo.
+  }
+}
+
+function pushCurrentMatchToHistory(winnerKey) {
+  const local = state.localSlot || "human";
+  const opponent = opponentOf(local);
+  const localPlayer = state.players[local] || createPlayerState(local);
+  const opponentPlayer = state.players[opponent] || createPlayerState(opponent);
+  const result = winnerKey === local ? "WIN" : winnerKey === opponent ? "LOSS" : "DRAW";
+  const review = state.postGameReview || createPostGameReviewState();
+  const fallbackLine = review.feedback || "Mind game battle finished.";
+  const highlightLine = review.highlights && review.highlights[0] ? review.highlights[0].resultText || fallbackLine : fallbackLine;
+  const entry = normalizeMatchHistoryEntry(
+    {
+      id: `hist-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      opponentName: slotName(opponent),
+      opponentHeroId: getHeroIdForSlot(opponent),
+      result,
+      localHp: localPlayer.hp,
+      localGold: localPlayer.gold,
+      opponentHp: opponentPlayer.hp,
+      opponentGold: opponentPlayer.gold,
+      highlightLine,
+      reviewSnapshot: review
+    },
+    0
+  );
+  if (!entry) return;
+  if (!Array.isArray(state.matchHistory)) state.matchHistory = [];
+  state.matchHistory = [entry, ...state.matchHistory.filter((item) => item && item.id !== entry.id)].slice(0, 10);
+  persistMatchHistory();
 }
 
 function getLeagueSegmentByPoints(points = state.progression.points) {
@@ -3721,6 +3850,7 @@ function concludeMatch(winnerKey, reason) {
     applyProgressAfterCompletedMatch(winnerKey);
   }
   state.postGameReview = buildPostGameReviewData(winnerKey);
+  pushCurrentMatchToHistory(winnerKey);
   state.phase = PHASES.matchEnd;
   state.screen = APP_SCREENS.result;
   state.matchWinner = winnerKey;
@@ -4455,76 +4585,15 @@ function handleScreenTransitionAnimations() {
   const current = state.screen;
   if (previous === current) return;
   uiRuntime.lastScreen = current;
+  hideInlineHintTooltip();
   if (previous === APP_SCREENS.result) clearResultRevealTimers();
   if (previous === APP_SCREENS.review) clearReviewSequenceTimers();
   if (current === APP_SCREENS.result) startResultRevealSequence();
   if (current === APP_SCREENS.review) startReviewRevealSequence();
 }
 
-function buildCaptureNodeFromReviewCard() {
-  const source = ui.reviewScreen ? ui.reviewScreen.querySelector(".review-card") : null;
-  if (!(source instanceof HTMLElement)) return null;
-  if (state.screen === APP_SCREENS.review) return { node: source, cleanup: null };
-  const clone = source.cloneNode(true);
-  if (!(clone instanceof HTMLElement)) return null;
-  clone.classList.add("share-capture-clone");
-  document.body.appendChild(clone);
-  return {
-    node: clone,
-    cleanup: () => {
-      clone.remove();
-    }
-  };
-}
-
-function prepareReviewNodeForCapture(node) {
-  if (!(node instanceof HTMLElement)) return;
-  node.querySelectorAll("[data-review-metric]").forEach((metricNode) => metricNode.classList.add("review-metric-visible"));
-  node.querySelectorAll(".review-ring").forEach((ringNode) => {
-    const target = clamp(Number(ringNode.getAttribute("data-target")) || 0, 0, 100);
-    ringNode.style.setProperty("--progress", `${target}`);
-  });
-  node.querySelectorAll(".review-ring-value").forEach((valueNode) => {
-    const ringNode = valueNode.closest(".review-ring");
-    const target = ringNode ? clamp(Number(ringNode.getAttribute("data-target")) || 0, 0, 100) : 0;
-    valueNode.textContent = `${target}%`;
-  });
-  const title = node.querySelector("#reviewMomentsTitle, .review-moments-title");
-  if (title instanceof HTMLElement) {
-    title.classList.remove("hidden");
-    title.classList.add("review-moments-title-visible");
-  }
-  node.querySelectorAll(".review-moment-card").forEach((cardNode) => cardNode.classList.add("review-moment-visible"));
-  const finalNode = node.querySelector("#reviewFinalMessageText, .review-final-message");
-  if (finalNode instanceof HTMLElement) {
-    finalNode.classList.remove("hidden");
-    finalNode.classList.add("review-final-message-visible");
-  }
-}
-
-async function shareReviewHighlightImage() {
-  ensurePostGameReviewReady();
-  const capture = buildCaptureNodeFromReviewCard();
-  if (!capture || !(capture.node instanceof HTMLElement) || typeof window.html2canvas !== "function") {
-    showActionToast("Sharing coming soon.");
-    return;
-  }
-  try {
-    prepareReviewNodeForCapture(capture.node);
-    const canvas = await window.html2canvas(capture.node, {
-      useCORS: true,
-      backgroundColor: "#1f1f1e",
-      scale: Math.max(2, Math.floor(window.devicePixelRatio || 2))
-    });
-    const link = document.createElement("a");
-    link.download = "gambit-liars-highlight.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  } catch (_error) {
-    showActionToast("Sharing coming soon.");
-  } finally {
-    if (capture.cleanup) capture.cleanup();
-  }
+function shareReviewHighlightImage(anchor = null) {
+  showInlineHintNearElement(anchor, "Sharing coming soon.");
 }
 
 function runResolutionAfterDelay(applyFn) {
@@ -5983,10 +6052,271 @@ function renderCollectionList() {
   ui.collectionList.appendChild(fragment);
 }
 
+function normalizePostGameReviewSnapshot(snapshot) {
+  const base = createPostGameReviewState();
+  if (!snapshot || typeof snapshot !== "object") return base;
+  const normalized = {
+    ...base,
+    bluffSuccessRate: clamp(Number(snapshot.bluffSuccessRate) || 0, 0, 100),
+    challengeAccuracy: clamp(Number(snapshot.challengeAccuracy) || 0, 0, 100),
+    optimalDecisions: clamp(Number(snapshot.optimalDecisions) || 0, 0, 100),
+    feedback: String(snapshot.feedback || base.feedback),
+    matchBadgeText: String(snapshot.matchBadgeText || base.matchBadgeText),
+    finalMessage: String(snapshot.finalMessage || base.finalMessage),
+    highlights: []
+  };
+  const highlights = Array.isArray(snapshot.highlights) ? snapshot.highlights : [];
+  normalized.highlights = highlights.slice(0, 4).map((item, index) => ({
+    turnNumber: Math.max(1, Number(item?.turnNumber) || index + 1),
+    label: String(item?.label || "Great Read"),
+    actionText: String(item?.actionText || "You made a smart move."),
+    resultText: String(item?.resultText || "Strong pressure and momentum control."),
+    priority: Number(item?.priority) || 0
+  }));
+  return normalized;
+}
+
+function getTvHistoryRows() {
+  const real = Array.isArray(state.matchHistory) ? state.matchHistory.slice(0, 10) : [];
+  const rows = real.map((entry) => ({
+    id: entry.id,
+    source: "real",
+    result: normalizeHistoryResult(entry.result),
+    opponentName: entry.opponentName,
+    opponentHeroId: entry.opponentHeroId,
+    highlightLine: entry.highlightLine || "Mind game battle finished.",
+    reviewSnapshot: entry.reviewSnapshot
+  }));
+  const needed = Math.max(0, 10 - rows.length);
+  for (let i = 0; i < needed; i += 1) {
+    const mock = TV_COMMUNITY_MATCHES[i % TV_COMMUNITY_MATCHES.length];
+    rows.push({
+      id: `mock-${mock.id}-${i}`,
+      source: "mock",
+      result: normalizeHistoryResult(mock.result),
+      opponentName: mock.opponentName,
+      opponentHeroId: normalizeHeroId(mock.opponentHeroId),
+      highlightLine: mock.highlightLine,
+      reviewSnapshot: null
+    });
+  }
+  return rows.slice(0, 10);
+}
+
+function createTvResultBadge(result) {
+  const badge = document.createElement("span");
+  const normalized = normalizeHistoryResult(result);
+  badge.className = `tv-result-badge ${normalized === "WIN" ? "tv-result-win" : normalized === "LOSS" ? "tv-result-loss" : "tv-result-draw"}`;
+  badge.textContent = normalized;
+  return badge;
+}
+
+function createTvHeroLine(name, heroId) {
+  const row = document.createElement("div");
+  row.className = "tv-player-line";
+  const icon = document.createElement("span");
+  icon.className = "avatar-art tv-hero-art";
+  renderAvatar(icon, heroId);
+  const text = document.createElement("p");
+  text.className = "tv-player-name";
+  text.textContent = String(name || "Player");
+  row.appendChild(icon);
+  row.appendChild(text);
+  return row;
+}
+
+function renderTvLiveTab(content) {
+  TV_LIVE_MATCHES.forEach((match) => {
+    const card = document.createElement("article");
+    card.className = "tv-live-card";
+
+    const top = document.createElement("div");
+    top.className = "tv-live-top";
+    const league = document.createElement("p");
+    league.className = "tv-live-league";
+    league.textContent = `${match.league} League`;
+    const live = document.createElement("span");
+    live.className = "tv-live-badge";
+    live.textContent = "LIVE";
+    top.appendChild(league);
+    top.appendChild(live);
+    card.appendChild(top);
+
+    card.appendChild(createTvHeroLine(match.playerA, match.heroA));
+    const vs = document.createElement("p");
+    vs.className = "tv-player-vs";
+    vs.textContent = "vs";
+    card.appendChild(vs);
+    card.appendChild(createTvHeroLine(match.playerB, match.heroB));
+
+    const watch = document.createElement("button");
+    watch.type = "button";
+    watch.className = "btn btn-secondary tv-live-watch-btn";
+    watch.dataset.tvAction = "live-watch";
+    watch.textContent = "Watch";
+    card.appendChild(watch);
+    content.appendChild(card);
+  });
+}
+
+function renderTvHighlightsTab(content) {
+  TV_HIGHLIGHTS.forEach((entry) => {
+    const card = document.createElement("article");
+    card.className = "tv-highlight-card";
+    const title = document.createElement("p");
+    title.className = "tv-highlight-title";
+    title.textContent = entry.title;
+    const matchup = document.createElement("p");
+    matchup.className = "tv-highlight-matchup";
+    matchup.textContent = entry.matchup;
+    const line = document.createElement("p");
+    line.className = "tv-highlight-line";
+    line.textContent = entry.line;
+    const replay = document.createElement("button");
+    replay.type = "button";
+    replay.className = "btn btn-secondary tv-highlight-replay-btn";
+    replay.dataset.tvAction = "highlight-replay";
+    replay.textContent = "Replay";
+    card.appendChild(title);
+    card.appendChild(matchup);
+    card.appendChild(line);
+    card.appendChild(replay);
+    content.appendChild(card);
+  });
+}
+
+function renderTvHistoryRow(content, row) {
+  const card = document.createElement("article");
+  card.className = "tv-history-row";
+
+  const top = document.createElement("div");
+  top.className = "tv-history-row-top";
+  top.appendChild(createTvResultBadge(row.result));
+  const opponent = document.createElement("div");
+  opponent.className = "tv-history-opponent";
+  const hero = document.createElement("span");
+  hero.className = "avatar-art tv-hero-art";
+  renderAvatar(hero, row.opponentHeroId);
+  const name = document.createElement("p");
+  name.className = "tv-player-name";
+  name.textContent = row.opponentName;
+  opponent.appendChild(hero);
+  opponent.appendChild(name);
+  top.appendChild(opponent);
+  card.appendChild(top);
+
+  const meta = document.createElement("p");
+  meta.className = "tv-history-meta";
+  meta.textContent = `${getHeroMeta(row.opponentHeroId).displayName} - ${row.highlightLine}`;
+  card.appendChild(meta);
+
+  const actions = document.createElement("div");
+  actions.className = "tv-history-actions";
+  const review = document.createElement("button");
+  review.type = "button";
+  review.className = "btn btn-secondary tv-history-btn";
+  review.dataset.tvAction = "history-review";
+  review.dataset.historyId = row.id;
+  review.textContent = "Review";
+  const replay = document.createElement("button");
+  replay.type = "button";
+  replay.className = "btn btn-secondary tv-history-btn tv-row-btn-disabled";
+  replay.dataset.tvAction = "history-replay";
+  replay.setAttribute("aria-disabled", "true");
+  replay.textContent = "Replay";
+  actions.appendChild(review);
+  actions.appendChild(replay);
+  card.appendChild(actions);
+
+  content.appendChild(card);
+}
+
+function renderTvHistoryTab(content) {
+  const recentTitle = document.createElement("h3");
+  recentTitle.className = "tv-section-title";
+  recentTitle.textContent = "Your Recent Matches";
+  content.appendChild(recentTitle);
+
+  const historyRows = getTvHistoryRows();
+  historyRows.forEach((row) => renderTvHistoryRow(content, row));
+
+  const communityTitle = document.createElement("h3");
+  communityTitle.className = "tv-section-title";
+  communityTitle.textContent = "Community Picks";
+  content.appendChild(communityTitle);
+
+  const community = document.createElement("div");
+  community.className = "tv-community-grid";
+  TV_COMMUNITY_MATCHES.forEach((entry) => {
+    const row = document.createElement("article");
+    row.className = "tv-community-row";
+    const top = document.createElement("div");
+    top.className = "tv-history-row-top";
+    top.appendChild(createTvResultBadge(entry.result));
+    const opponent = document.createElement("div");
+    opponent.className = "tv-history-opponent";
+    const hero = document.createElement("span");
+    hero.className = "avatar-art tv-hero-art";
+    renderAvatar(hero, entry.opponentHeroId);
+    const name = document.createElement("p");
+    name.className = "tv-community-name";
+    name.textContent = entry.opponentName;
+    opponent.appendChild(hero);
+    opponent.appendChild(name);
+    top.appendChild(opponent);
+    row.appendChild(top);
+
+    const line = document.createElement("p");
+    line.className = "tv-community-line";
+    line.textContent = entry.highlightLine;
+    row.appendChild(line);
+    community.appendChild(row);
+  });
+  content.appendChild(community);
+}
+
+function renderTvTabContent() {
+  if (!ui.tvTabContent) return;
+  const activeTab = TV_TABS.includes(state.tv?.tab) ? state.tv.tab : "live";
+  state.tv.tab = activeTab;
+  ui.tvTabContent.innerHTML = "";
+
+  if (ui.tvTabButtons && Array.isArray(ui.tvTabButtons)) {
+    ui.tvTabButtons.forEach((button) => {
+      const tab = String(button.dataset.tvTab || "").toLowerCase();
+      const active = tab === activeTab;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+
+  if (activeTab === "live") {
+    renderTvLiveTab(ui.tvTabContent);
+    return;
+  }
+  if (activeTab === "highlights") {
+    renderTvHighlightsTab(ui.tvTabContent);
+    return;
+  }
+  renderTvHistoryTab(ui.tvTabContent);
+}
+
+function openHistoryReviewById(historyId, anchor = null) {
+  const entry = Array.isArray(state.matchHistory) ? state.matchHistory.find((item) => item && item.id === historyId) : null;
+  if (!entry || !entry.reviewSnapshot) {
+    showInlineHintNearElement(anchor, "Review coming soon for past matches.");
+    return;
+  }
+  state.postGameReview = normalizePostGameReviewSnapshot(entry.reviewSnapshot);
+  state.screen = APP_SCREENS.review;
+  updateUI();
+}
+
 function updateUI() {
   const map = {
     [APP_SCREENS.home]: ui.homeScreen,
     [APP_SCREENS.mode]: ui.modeScreen,
+    [APP_SCREENS.tv]: ui.tvScreen,
     [APP_SCREENS.friend]: ui.friendScreen,
     [APP_SCREENS.waiting]: ui.waitingScreen,
     [APP_SCREENS.game]: ui.gameScreen,
@@ -6038,6 +6368,7 @@ function updateUI() {
   renderAvatarChoices();
   renderLeagueProgressTrack();
   renderCollectionList();
+  renderTvTabContent();
   if (ui.collectionTabs && Array.isArray(ui.collectionTabs)) {
     ui.collectionTabs.forEach((tabButton) => {
       const tab = (tabButton.dataset.tab || "").toLowerCase();
@@ -6872,6 +7203,42 @@ function showActionToast(message) {
   }, UI_TIMINGS.actionToastMs);
 }
 
+function hideInlineHintTooltip() {
+  if (uiRuntime.inlineHintTimerId) {
+    clearTimeout(uiRuntime.inlineHintTimerId);
+    uiRuntime.inlineHintTimerId = null;
+  }
+  if (ui.inlineHintTooltip) ui.inlineHintTooltip.classList.add("hidden");
+}
+
+function showInlineHintNearElement(anchor, message) {
+  const text = String(message || "").trim();
+  if (!text) return;
+  if (!ui.inlineHintTooltip || !(anchor instanceof HTMLElement)) {
+    showActionToast(text);
+    return;
+  }
+  hideInlineHintTooltip();
+  ui.inlineHintTooltip.textContent = text;
+  ui.inlineHintTooltip.classList.remove("hidden");
+
+  const tooltipRect = ui.inlineHintTooltip.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const top = Math.max(8, anchorRect.top - tooltipRect.height - 8);
+  const left = clamp(
+    anchorRect.left + anchorRect.width / 2 - tooltipRect.width / 2,
+    8,
+    window.innerWidth - tooltipRect.width - 8
+  );
+  ui.inlineHintTooltip.style.left = `${left}px`;
+  ui.inlineHintTooltip.style.top = `${top}px`;
+
+  uiRuntime.inlineHintTimerId = setTimeout(() => {
+    ui.inlineHintTooltip.classList.add("hidden");
+    uiRuntime.inlineHintTimerId = null;
+  }, 1500);
+}
+
 function clearActionToast() {
   if (uiRuntime.actionToastTimerId) {
     clearTimeout(uiRuntime.actionToastTimerId);
@@ -7034,12 +7401,24 @@ function handlePlayAgain() {
 
 function bindEvents() {
   ui.homePlayBtn.addEventListener("click", () => runToModeScreen());
+  if (ui.homeTvBtn) {
+    ui.homeTvBtn.addEventListener("click", () => {
+      state.screen = APP_SCREENS.tv;
+      updateUI();
+    });
+  }
   ui.premiumBtn.addEventListener("click", () => openModal(ui.premiumModal));
 
   ui.modeBackBtn.addEventListener("click", () => {
     state.screen = APP_SCREENS.home;
     updateUI();
   });
+  if (ui.tvBackBtn) {
+    ui.tvBackBtn.addEventListener("click", () => {
+      state.screen = APP_SCREENS.home;
+      updateUI();
+    });
+  }
 
   ui.friendBackBtn.addEventListener("click", () => {
     void backToMenu();
@@ -7067,8 +7446,8 @@ function bindEvents() {
     }
     await backToMenu();
   });
-  ui.shareResultBtn.addEventListener("click", () => {
-    void shareReviewHighlightImage();
+  ui.shareResultBtn.addEventListener("click", (event) => {
+    shareReviewHighlightImage(event.currentTarget);
   });
   if (ui.openGameReviewBtn) {
     ui.openGameReviewBtn.addEventListener("click", () => {
@@ -7078,8 +7457,8 @@ function bindEvents() {
     });
   }
   if (ui.reviewShareBtn) {
-    ui.reviewShareBtn.addEventListener("click", () => {
-      void shareReviewHighlightImage();
+    ui.reviewShareBtn.addEventListener("click", (event) => {
+      shareReviewHighlightImage(event.currentTarget);
     });
   }
   if (ui.reviewPlayAgainBtn) {
@@ -7111,6 +7490,36 @@ function bindEvents() {
   ui.startTutorialBtn.addEventListener("click", () => {
     startBotMatch({ tutorialMatch: true });
   });
+  if (ui.tvTabButtons && Array.isArray(ui.tvTabButtons)) {
+    ui.tvTabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const tab = String(button.dataset.tvTab || "").toLowerCase();
+        if (!TV_TABS.includes(tab)) return;
+        state.tv.tab = tab;
+        updateUI();
+      });
+    });
+  }
+  if (ui.tvTabContent) {
+    ui.tvTabContent.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest("button[data-tv-action]");
+      if (!(button instanceof HTMLButtonElement)) return;
+      const action = String(button.dataset.tvAction || "");
+      if (action === "live-watch") {
+        openModal(ui.tvWatchModal);
+        return;
+      }
+      if (action === "highlight-replay" || action === "history-replay") {
+        showInlineHintNearElement(button, "Replay coming soon.");
+        return;
+      }
+      if (action === "history-review") {
+        openHistoryReviewById(String(button.dataset.historyId || ""), button);
+      }
+    });
+  }
 
   ui.createLinkBtn.addEventListener("click", () => {
     void createFriendRoomAsHost();
@@ -7143,6 +7552,7 @@ function bindEvents() {
   ui.rulesBtn.addEventListener("click", () => openModal(ui.rulesModal));
   ui.rulesCloseBtn.addEventListener("click", () => closeModal(ui.rulesModal));
   ui.premiumCloseBtn.addEventListener("click", () => closeModal(ui.premiumModal));
+  if (ui.tvWatchModalCloseBtn) ui.tvWatchModalCloseBtn.addEventListener("click", () => closeModal(ui.tvWatchModal));
   ui.goPremiumBtn.addEventListener("click", () => showActionToast("Available soon"));
   ui.tutorialNextBtn.addEventListener("click", () => advanceTutorialStep());
   if (ui.matchOnboardingNextBtn) {
@@ -7287,6 +7697,7 @@ function bindEvents() {
   bindModalDismiss(ui.rulesModal, ui.rulesCloseBtn);
   bindModalDismiss(ui.avatarModal, ui.avatarModalCloseBtn);
   bindModalDismiss(ui.premiumModal, ui.premiumCloseBtn);
+  bindModalDismiss(ui.tvWatchModal, ui.tvWatchModalCloseBtn);
   bindModalDismiss(ui.collectionModal, ui.collectionCloseBtn);
   bindModalDismiss(ui.leagueProgressModal, ui.leagueProgressCloseBtn);
   bindModalDismiss(ui.resetProgressModal, null);
@@ -7342,6 +7753,7 @@ function cacheElements() {
 
   ui.homeScreen = document.getElementById("homeScreen");
   ui.modeScreen = document.getElementById("modeScreen");
+  ui.tvScreen = document.getElementById("tvScreen");
   ui.friendScreen = document.getElementById("friendScreen");
   ui.waitingScreen = document.getElementById("waitingScreen");
   ui.gameScreen = document.getElementById("gameScreen");
@@ -7357,6 +7769,7 @@ function cacheElements() {
   ui.collectionBtnDot = document.getElementById("collectionBtnDot");
   ui.homeTipText = document.getElementById("homeTipText");
   ui.homeTipDots = document.getElementById("homeTipDots");
+  ui.homeTvBtn = document.getElementById("homeTvBtn");
   ui.playerNameInput = document.getElementById("playerNameInput");
   ui.avatarPreviewBtn = document.getElementById("avatarPreviewBtn");
   ui.avatarPreviewDot = document.getElementById("avatarPreviewDot");
@@ -7364,6 +7777,9 @@ function cacheElements() {
   ui.avatarPreviewLabel = document.getElementById("avatarPreviewLabel");
 
   ui.modeBackBtn = document.getElementById("modeBackBtn");
+  ui.tvBackBtn = document.getElementById("tvBackBtn");
+  ui.tvTabButtons = Array.from(document.querySelectorAll("[data-tv-tab]"));
+  ui.tvTabContent = document.getElementById("tvTabContent");
   ui.playBotBtn = document.getElementById("playBotBtn");
   ui.playFriendBtn = document.getElementById("playFriendBtn");
   ui.rankedBtn = document.getElementById("rankedBtn");
@@ -7499,8 +7915,11 @@ function cacheElements() {
   ui.premiumModal = document.getElementById("premiumModal");
   ui.premiumCloseBtn = document.getElementById("premiumCloseBtn");
   ui.goPremiumBtn = document.getElementById("goPremiumBtn");
+  ui.tvWatchModal = document.getElementById("tvWatchModal");
+  ui.tvWatchModalCloseBtn = document.getElementById("tvWatchModalCloseBtn");
   ui.copyToast = document.getElementById("copyToast");
   ui.actionToast = document.getElementById("actionToast");
+  ui.inlineHintTooltip = document.getElementById("inlineHintTooltip");
   ui.heroTooltipOverlay = document.getElementById("heroTooltipOverlay");
   ui.heroTooltipTitle = document.getElementById("heroTooltipTitle");
   ui.heroTooltipText = document.getElementById("heroTooltipText");
@@ -7588,6 +8007,7 @@ function exposeSupabaseTest() {
 async function init() {
   cacheElements();
   state.progression = loadProgressionStateFromStorage();
+  state.matchHistory = loadMatchHistoryFromStorage();
   applyAssetCssVariables();
   renderAvatarChoices();
   renderRulesRoleList();

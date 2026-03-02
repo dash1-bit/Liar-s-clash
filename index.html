@@ -39,6 +39,15 @@
 
         <button id="homePlayBtn" class="btn btn-primary btn-play-pulse" type="button">PLAY</button>
         <button id="premiumBtn" class="btn btn-premium" type="button">Become Premium</button>
+        <button id="homeTvBtn" class="btn btn-secondary home-tv-btn" type="button">
+          <span class="btn-inline-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M12 8a1 1 0 0 1 1 1v2.3l1.7 1a1 1 0 1 1-1 1.7l-2.2-1.3A1 1 0 0 1 11 12V9a1 1 0 0 1 1-1Z"></path>
+              <path d="M12 3a9 9 0 1 1-9 9 1 1 0 1 1 2 0 7 7 0 1 0 2-5l.3.3a1 1 0 1 1-1.4 1.4L3.3 6.4A1 1 0 0 1 3 5.7V3a1 1 0 1 1 2 0v1.1A9 9 0 0 1 12 3Z"></path>
+            </svg>
+          </span>
+          TV
+        </button>
       </div>
       <section class="home-tips" aria-label="Tips">
         <p class="home-tips-title">Tips</p>
@@ -62,6 +71,22 @@
           <button id="startTutorialBtn" class="btn btn-secondary mode-helper-btn" type="button">Learn the Basics</button>
           <p class="helper-text mode-helper-text">Play a short guided match to understand the core mechanics.</p>
         </div>
+      </div>
+    </section>
+
+    <section id="tvScreen" class="screen" aria-label="TV">
+      <div class="top-row">
+        <button id="tvBackBtn" class="btn btn-back" type="button">Back to Menu</button>
+      </div>
+      <div class="screen-card tv-card">
+        <h2 class="section-title">TV</h2>
+        <p class="helper-text tv-subtitle">Watch mind games live. Learn from the community.</p>
+        <div class="tv-tabs" role="tablist" aria-label="TV tabs">
+          <button id="tvTabLiveBtn" class="tv-tab-btn active" type="button" data-tv-tab="live" aria-pressed="true">Live</button>
+          <button id="tvTabHighlightsBtn" class="tv-tab-btn" type="button" data-tv-tab="highlights" aria-pressed="false">Highlights</button>
+          <button id="tvTabHistoryBtn" class="tv-tab-btn" type="button" data-tv-tab="history" aria-pressed="false">History</button>
+        </div>
+        <div id="tvTabContent" class="tv-tab-content" aria-live="polite"></div>
       </div>
     </section>
 
@@ -297,6 +322,7 @@
   </section>
   <p id="copyToast" class="copy-toast hidden" role="status" aria-live="polite">Copied!</p>
   <p id="actionToast" class="action-toast hidden" role="status" aria-live="polite"></p>
+  <p id="inlineHintTooltip" class="inline-hint-tooltip hidden" role="status" aria-live="polite"></p>
   <div id="heroTooltipOverlay" class="hero-tooltip-overlay hidden" role="dialog" aria-modal="false" aria-label="Hero details">
     <div class="hero-tooltip-card">
       <p id="heroTooltipTitle" class="hero-tooltip-title">Hero</p>
@@ -510,8 +536,15 @@ STRIKE -> 1 damage (2 Gold)
     </div>
   </section>
 
+  <section id="tvWatchModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Live spectating">
+    <div class="modal-card tv-watch-modal-card">
+      <button id="tvWatchModalCloseBtn" class="modal-close-btn" type="button" aria-label="Close live spectating modal">X</button>
+      <h2 class="section-title">TV Live</h2>
+      <p class="helper-text">Live spectating coming soon.</p>
+    </div>
+  </section>
+
   <script src="supabase-public-config.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
