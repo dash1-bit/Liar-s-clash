@@ -11,7 +11,7 @@
   --surface-2: #262421;
   --badge-image: none;
   --cost-icon-image: none;
-  --tabbar-h: 68px;
+  --tabbar-h: 64px;
   --response-h: clamp(58px, 11vh, 84px);
   --tap: 44px;
   --pad: clamp(8px, 2.6vw, 14px);
@@ -76,6 +76,7 @@ body {
 
 #homeScreen {
   justify-content: flex-start;
+  padding: env(safe-area-inset-top) 0 calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
 
 .screen-with-tabs {
@@ -311,13 +312,27 @@ body {
   flex-direction: column;
   justify-content: flex-start;
   gap: 16px;
-  padding-top: 6px;
-  height: 100%;
+  padding: 16px;
+}
+
+.home-header-zone {
+  margin-bottom: 0;
+}
+
+.home-main-zone {
+  display: grid;
+  gap: 16px;
+}
+
+.home-actions-zone {
+  display: grid;
+  gap: 0;
+  margin-top: 8px;
 }
 
 .home-title-block {
   display: grid;
-  gap: 5px;
+  gap: 8px;
   justify-items: center;
 }
 
@@ -469,7 +484,7 @@ body {
 }
 
 .avatar-preview {
-  width: 100%;
+  width: auto;
   margin: 0 auto;
   border: 0;
   border-radius: 14px;
@@ -526,12 +541,13 @@ body {
 }
 
 .btn-play-pulse {
-  min-height: clamp(56px, 9vh, 66px);
+  min-height: 64px;
+  height: 64px;
   font-size: clamp(1.08rem, 3.5vw, 1.34rem);
   animation: playPulse 2.2s ease-in-out infinite;
   width: 100%;
-  margin-top: 20px;
-  margin-bottom: 16px;
+  margin-top: 0;
+  margin-bottom: 20px;
   box-shadow:
     0 0 0 1px rgba(129, 182, 76, 0.24),
     0 10px 18px rgba(27, 46, 12, 0.42),
@@ -593,6 +609,7 @@ body {
 .premium-row-cta {
   width: 100%;
   min-height: 48px;
+  height: 48px;
   border-radius: 12px;
   border-color: rgba(231, 194, 96, 0.72);
   background: rgba(34, 31, 26, 0.96);
@@ -664,10 +681,12 @@ body {
   border: 1px solid rgba(115, 111, 103, 0.58);
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(44, 41, 37, 0.94), rgba(33, 30, 27, 0.95));
-  padding: 12px;
+  padding: 8px;
   display: grid;
-  gap: 8px;
-  min-height: 126px;
+  gap: 6px;
+  min-height: 120px;
+  max-height: 130px;
+  align-content: center;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
 }
 
@@ -683,13 +702,14 @@ body {
   border-top: 1px solid rgba(110, 106, 100, 0.55);
   background: rgba(22, 20, 18, 0.94);
   backdrop-filter: blur(8px);
+  min-height: 64px;
   padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
 }
 
 .bottom-tab-btn {
   border: 0;
   border-radius: 10px;
-  min-height: 50px;
+  min-height: 48px;
   padding: 4px 3px;
   background: transparent;
   color: #c4c3bf;
