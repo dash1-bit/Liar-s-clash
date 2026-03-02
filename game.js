@@ -160,6 +160,8 @@ const GAME_EVENTS = Object.freeze(Object.values(GAME_EVENT_REGISTRY));
 const HERO_ORDER = Object.freeze(["adventurer", "noble", "rogue", "guardian", "oracle"]);
 const COLLECTION_TABS = Object.freeze(["cards", "heroes", "events"]);
 const PROGRESSION_STORAGE_KEY = "liarsClashProgressionV3";
+const MATCHES_PLAYED_COUNT_STORAGE_KEY = "matchesPlayedCount";
+const DEMON_BOT_MATCH_THRESHOLD = 3;
 
 const LEAGUE_SEGMENTS = Object.freeze([
   Object.freeze({ id: "wood_iii", league: "Wood", subleague: "III", basePoints: 0 }),
@@ -575,6 +577,7 @@ const state = {
   mode: null,
   profile: { name: "Matt", heroId: "adventurer", ranking: 1000, opponentRanking: 1000 },
   progression: createDefaultProgressionState(),
+  matchesPlayedCount: 0,
   collection: { tab: "cards" },
   tv: { tab: "live" },
   matchHistory: [],
@@ -626,7 +629,7 @@ const state = {
   events: [],
   resolutionToken: 0,
   timer: { mode: null, remaining: 0, expiresAt: 0, intervalId: null, timeoutId: null, token: 0 },
-  ai: { suspicion: createSuspicionMap() },
+  ai: createBotAiState(),
   players: { human: createPlayerState("human"), bot: createPlayerState("bot") }
 };
 
@@ -1150,12 +1153,42 @@ function createPlayerState(key, startHp = MATCH_SETTINGS.START_HP) {
   };
 }
 
-function createSuspicionMap() {
-  const map = {};
+function createRoleBeliefMap(initialValue = 0.5) {
+  const map = Object.create(null);
   Object.values(ROLE_CONFIG).forEach((meta) => {
-    if (!meta.passive) map[meta.name] = 0.35;
+    if (!meta || meta.passive) return;
+    map[meta.name] = clamp(Number(initialValue) || 0.5, 0.05, 0.95);
   });
   return map;
+}
+
+function createRoleCounterMap(initialValue = 0) {
+  const map = Object.create(null);
+  Object.values(ROLE_CONFIG).forEach((meta) => {
+    if (!meta || meta.passive) return;
+    map[meta.name] = Math.max(0, Number(initialValue) || 0);
+  });
+  return map;
+}
+
+function createPlayerBehaviorStats(raw = null) {
+  return {
+    challengeOpportunities: Math.max(0, Number(raw && raw.challengeOpportunities) || 0),
+    challenges: Math.max(0, Number(raw && raw.challenges) || 0),
+    bluffsCaught: Math.max(0, Number(raw && raw.bluffsCaught) || 0),
+    turns: Math.max(0, Number(raw && raw.turns) || 0),
+    damageActions: Math.max(0, Number(raw && raw.damageActions) || 0)
+  };
+}
+
+function createBotAiState(options = {}) {
+  return {
+    demonActive: Boolean(options.demonActive),
+    beliefRealByRole: createRoleBeliefMap(0.5),
+    repeatUnchallengedByRole: createRoleCounterMap(0),
+    botBluffUsageByRole: createRoleCounterMap(0),
+    playerModel: createPlayerBehaviorStats(options.playerModel || null)
+  };
 }
 
 function createDraftState() {
@@ -1307,6 +1340,37 @@ function persistProgressionState() {
   } catch (_error) {
     // Ignore storage write failures for demo build.
   }
+}
+
+function loadMatchesPlayedCountFromStorage() {
+  try {
+    const raw = window.localStorage.getItem(MATCHES_PLAYED_COUNT_STORAGE_KEY);
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.floor(parsed));
+  } catch (_error) {
+    return 0;
+  }
+}
+
+function persistMatchesPlayedCount() {
+  try {
+    window.localStorage.setItem(
+      MATCHES_PLAYED_COUNT_STORAGE_KEY,
+      String(Math.max(0, Math.floor(Number(state.matchesPlayedCount) || 0)))
+    );
+  } catch (_error) {
+    // Ignore storage write failures for demo build.
+  }
+}
+
+function incrementMatchesPlayedCount() {
+  state.matchesPlayedCount = Math.max(0, Math.floor(Number(state.matchesPlayedCount) || 0)) + 1;
+  persistMatchesPlayedCount();
+}
+
+function isDemonBotUnlocked() {
+  return Math.max(0, Math.floor(Number(state.matchesPlayedCount) || 0)) >= DEMON_BOT_MATCH_THRESHOLD;
 }
 
 function normalizeHistoryResult(result) {
@@ -2766,7 +2830,11 @@ function resetMatchState(options = {}) {
   const startHp = getStartingHpForEvent(gameEventId);
   state.players.human = createPlayerState("human", startHp);
   state.players.bot = createPlayerState("bot", startHp);
-  state.ai.suspicion = createSuspicionMap();
+  const carriedPlayerModel = state.ai && state.ai.playerModel ? state.ai.playerModel : createPlayerBehaviorStats();
+  state.ai = createBotAiState({
+    demonActive: Boolean(options.demonBotActive && state.mode === "bot" && !options.tutorialMatch),
+    playerModel: carriedPlayerModel
+  });
   state.gameEventId = gameEventId;
 
   if (options.loadout && options.loadout.human && options.loadout.bot) {
@@ -2901,6 +2969,7 @@ function startBotMatch(options = {}) {
   state.localSlot = "human";
 
   const tutorialMatch = Boolean(options.tutorialMatch);
+  const demonBotActive = !tutorialMatch && isDemonBotUnlocked();
   const matchSeed = generateMatchSeed();
   const firstMatchScripted = tutorialMatch || (Number(state.progression.matchesCompleted) || 0) === 0;
   const gameEventId = pickRandomGameEventId();
@@ -2914,6 +2983,7 @@ function startBotMatch(options = {}) {
     stage: "match-start",
     firstMatchScripted,
     tutorialMatch,
+    demonBotActive,
     matchSeed,
     gameEventId,
     startingActor: firstMatchScripted ? "human" : starterRng() < 0.5 ? "human" : "bot",
@@ -3303,6 +3373,7 @@ function applyDraftFinalStart(payload) {
     gameEventId: payload.gameEventId,
     firstMatchScripted: Boolean(payload.firstMatchScripted),
     tutorialMatch: Boolean(payload.tutorialMatch),
+    demonBotActive: Boolean(payload.demonBotActive),
     loadout: {
       human: payload.players.human,
       bot: payload.players.bot
@@ -3847,6 +3918,7 @@ function concludeMatch(winnerKey, reason) {
     state.profile.opponentRanking = Math.max(0, state.profile.opponentRanking - delta);
   }
   if (!isTutorialMatchActive()) {
+    incrementMatchesPlayedCount();
     applyProgressAfterCompletedMatch(winnerKey);
   }
   state.postGameReview = buildPostGameReviewData(winnerKey);
@@ -4653,6 +4725,8 @@ function playAction(input) {
     challengeable: action.challengeable,
     cost: action.cost
   };
+  recordPlayerActionProfile(actor, state.pendingAction);
+  if (actor === "bot") recordBotBluffPattern(state.pendingAction);
   state.pendingAction.reviewEntryId = recordPendingActionForReview(state.pendingAction);
 
   setCurrentAction(formatActionText(actor, action));
@@ -4755,11 +4829,6 @@ function playerHasRealRole(playerKey, role) {
   return player.cards.some((card) => card && card.isReal && card.role === role);
 }
 
-function adjustSuspicion(role, delta) {
-  if (!(role in state.ai.suspicion)) return;
-  state.ai.suspicion[role] = clamp(state.ai.suspicion[role] + delta, 0.05, 0.95);
-}
-
 function resolveAccept() {
   if (state.phase !== PHASES.awaitingResponse) return;
   clearFirstMatchDecisionGuideDelay();
@@ -4774,6 +4843,12 @@ function resolveAccept() {
   setCurrentAction(formatDecisionText(state.pendingResponder || opponentOf(action.actor), "ACCEPT"));
   if (isFirstScriptedBotMatchActive() && action.actor === "bot" && (state.pendingResponder || opponentOf(action.actor)) === "human") {
     state.firstMatchGuide.awaitingFinalOverlay = true;
+  }
+  if (state.mode === "bot" && action.actor === "bot" && state.pendingResponder === "human") {
+    recordPlayerResponseProfile("ACCEPT", false);
+  }
+  if (state.mode === "bot" && action.actor === "human" && state.pendingResponder === "bot") {
+    updateBeliefsAfterBotAccept(action);
   }
 
   runResolutionAfterDelay(() => {
@@ -4803,6 +4878,12 @@ function resolveChallenge() {
   markRoleReveal(actor, action.cardIndex, isReal ? "REAL" : "FAKE");
   state.pendingChallengeResult = { actor, challenger, role: action.role, isReal };
   markReviewDecision(action.reviewEntryId, "CHALLENGE", { isReal });
+  if (state.mode === "bot" && actor === "bot" && challenger === "human") {
+    recordPlayerResponseProfile("CHALLENGE", !isReal);
+  }
+  if (state.mode === "bot" && actor === "human" && challenger === "bot") {
+    updateBeliefsAfterBotChallenge(action, isReal);
+  }
 
   setCurrentAction(formatChallengeOutcome(isReal, actor, challenger));
   if (isFirstScriptedBotMatchActive() && actor === "bot" && challenger === "human") {
@@ -4819,11 +4900,9 @@ function resolveChallenge() {
     if (result.isReal) {
       applyDamage(result.challenger, 1, "failed challenge");
       applyEffect(pending);
-      if (state.mode === "bot" && result.challenger === "bot") adjustSuspicion(result.role, -0.15);
     } else {
       applyDamage(result.actor, 2, "bluff penalty");
       if (playerHasRealRole(result.challenger, "ELF")) applyGold(result.challenger, 2, "ELF catch lie bonus");
-      if (state.mode === "bot" && result.challenger === "bot") adjustSuspicion(result.role, 0.24);
     }
 
     finalizeReviewEntry(pending.reviewEntryId);
@@ -4997,124 +5076,246 @@ function gatherLegalActions(playerKey) {
   return actions;
 }
 
-function getBotBluffRate() {
-  const hpDiff = state.players.bot.hp - state.players.human.hp;
-  if (hpDiff <= -2) return 0.4;
-  if (hpDiff >= 2) return 0.15;
-  return 0.25;
+function clampBeliefReal(value) {
+  return clamp(Number(value) || 0.5, 0.05, 0.95);
 }
 
-function expectedHumanDamagePressure() {
-  const human = state.players.human;
-  let pressure = 0;
-  if (human.gold >= 2) pressure += 1;
-  pressure += (1 - state.ai.suspicion.KNIGHT) * 0.8;
-  pressure += (1 - state.ai.suspicion.PIRATE) * 0.4;
-  return pressure;
+function getBeliefRealForRole(role) {
+  const normalized = String(role || "").toUpperCase();
+  if (!state.ai || !state.ai.beliefRealByRole || !(normalized in state.ai.beliefRealByRole)) return 0.5;
+  return clampBeliefReal(state.ai.beliefRealByRole[normalized]);
 }
 
-function scoreBotAction(action) {
-  const bot = state.players.bot;
-  const human = state.players.human;
-  let score = 0.6 + Math.random() * 0.45;
-
-  if (action.kind === "basic") {
-    if (action.id === "INTEREST") {
-      score += bot.gold <= 1 ? 3.1 : 1.0;
-      if (bot.hp <= 2) score -= 0.4;
-      return score;
-    }
-    if (action.id === "STRIKE") {
-      score += 2.2;
-      if (human.hp <= 1) score += 8;
-      else if (human.hp <= 2) score += 2.2;
-      if (bot.gold <= 2) score -= 0.3;
-      return score;
-    }
-  }
-
-  switch (action.role) {
-    case "KNIGHT":
-      score += 3;
-      if (human.hp <= 2) score += 8;
-      else if (human.hp <= 3) score += 2.5;
-      break;
-    case "ENT":
-      if (bot.hp <= 2) score += 5.4;
-      else if (bot.hp <= 3) score += 2.8;
-      else score += 0.7;
-      break;
-    case "GOBLIN":
-      score += human.gold > 0 ? 2.6 : 0.3;
-      if (human.gold >= 2) score += 1.2;
-      break;
-    case "DWARF":
-      score += bot.shield ? -1.4 : 0.8;
-      score += expectedHumanDamagePressure() >= 1 ? 1.9 : 0.4;
-      break;
-    case "SIREN":
-      score += bot.hp + 1 <= human.hp ? 2.4 : 0.9;
-      if (bot.gold < 2) score += 0.5;
-      break;
-    case "PIRATE":
-      score += human.hp <= 2 ? 3.1 : 1.4;
-      break;
-    case "SCIENTIST": {
-      const unknownCount = state.players.human.cards.filter(
-        (card) => card && card.verification !== "REAL" && card.verification !== "FAKE"
-      ).length;
-      score += 1.3 + unknownCount * 0.45;
-      break;
-    }
-    case "JOKER":
-      score += human.hp <= 2 ? 2.6 : 1.7;
-      break;
-    case "BERSERK":
-      score += human.hp <= 2 ? 2.4 : 1.2;
-      if (bot.hp <= 2) score -= 1.5;
-      break;
-    case "BANKER":
-      score += bot.bankerBuff ? -0.8 : 1.9;
-      break;
-    case "ANGEL":
-      if (bot.hp <= 2 && bot.gold >= 3) score += 3.4;
-      else score += 0.7;
-      break;
-    case "VALK":
-      score += bot.hp <= 3 ? 3.4 : 2.1;
-      break;
-    case "APPRENTICE": {
-      const card = getCardByIndex("bot", action.cardIndex);
-      const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
-      score += dmg * 1.25;
-      if (human.hp <= dmg) score += 4.2;
-      break;
-    }
-    default:
-      break;
-  }
-
-  if (!action.isReal) {
-    const bluffRate = getBotBluffRate();
-    score -= (1 - bluffRate) * 1.2;
-    if (bot.hp + 2 <= human.hp) score += 0.6;
-  }
-
-  return score;
+function setBeliefRealForRole(role, value) {
+  const normalized = String(role || "").toUpperCase();
+  if (!state.ai || !state.ai.beliefRealByRole || !(normalized in state.ai.beliefRealByRole)) return;
+  state.ai.beliefRealByRole[normalized] = clampBeliefReal(value);
 }
 
-function chooseWeightedAction(scoredActions) {
-  const top = scoredActions.slice(0, Math.min(3, scoredActions.length));
-  const weights = top.map((item) => Math.max(0.2, item.score));
-  const total = weights.reduce((sum, value) => sum + value, 0);
+function adjustBeliefRealForRole(role, delta) {
+  setBeliefRealForRole(role, getBeliefRealForRole(role) + (Number(delta) || 0));
+}
 
-  let roll = Math.random() * total;
-  for (let i = 0; i < top.length; i += 1) {
-    roll -= weights[i];
-    if (roll <= 0) return top[i].action;
+function getPlayerChallengeRate() {
+  const model = state.ai && state.ai.playerModel ? state.ai.playerModel : createPlayerBehaviorStats();
+  return model.challengeOpportunities > 0
+    ? clamp(model.challenges / model.challengeOpportunities, 0.05, 0.95)
+    : 0.45;
+}
+
+function getPlayerBluffCaughtRate() {
+  const model = state.ai && state.ai.playerModel ? state.ai.playerModel : createPlayerBehaviorStats();
+  return model.challenges > 0
+    ? clamp(model.bluffsCaught / model.challenges, 0.05, 0.95)
+    : 0.5;
+}
+
+function getPlayerAggressionRate() {
+  const model = state.ai && state.ai.playerModel ? state.ai.playerModel : createPlayerBehaviorStats();
+  return model.turns > 0
+    ? clamp(model.damageActions / model.turns, 0.05, 0.95)
+    : 0.5;
+}
+
+function isDamageActionForProfile(action) {
+  if (!action) return false;
+  if (action.kind === "basic") return action.id === "STRIKE";
+  if (action.kind !== "role") return false;
+  const role = String(action.role || "").toUpperCase();
+  return role === "KNIGHT" || role === "SIREN" || role === "PIRATE" || role === "JOKER" || role === "BERSERK" || role === "VALK" || role === "APPRENTICE";
+}
+
+function recordPlayerActionProfile(actor, action) {
+  if (state.mode !== "bot" || actor !== "human" || !state.ai || !state.ai.playerModel) return;
+  const model = state.ai.playerModel;
+  model.turns = Math.max(0, Number(model.turns) || 0) + 1;
+  if (isDamageActionForProfile(action)) {
+    model.damageActions = Math.max(0, Number(model.damageActions) || 0) + 1;
+  }
+}
+
+function recordPlayerResponseProfile(choice, wasCorrect = false) {
+  if (state.mode !== "bot" || !state.ai || !state.ai.playerModel) return;
+  const model = state.ai.playerModel;
+  model.challengeOpportunities = Math.max(0, Number(model.challengeOpportunities) || 0) + 1;
+  if (choice === "CHALLENGE") {
+    model.challenges = Math.max(0, Number(model.challenges) || 0) + 1;
+    if (wasCorrect) model.bluffsCaught = Math.max(0, Number(model.bluffsCaught) || 0) + 1;
+  }
+}
+
+function recordBotBluffPattern(action) {
+  if (state.mode !== "bot" || !state.ai || !state.ai.botBluffUsageByRole || !action || action.kind !== "role") return;
+  const role = String(action.role || "").toUpperCase();
+  if (!(role in state.ai.botBluffUsageByRole)) return;
+  if (action.isReal) {
+    state.ai.botBluffUsageByRole[role] = Math.max(0, Number(state.ai.botBluffUsageByRole[role]) - 1);
+    return;
+  }
+  state.ai.botBluffUsageByRole[role] = Math.max(0, Number(state.ai.botBluffUsageByRole[role]) || 0) + 1;
+}
+
+function isStrongOpponentClaim(action) {
+  if (!action || action.kind !== "role") return false;
+  const role = String(action.role || "").toUpperCase();
+  const actor = state.players[action.actor] || createPlayerState(action.actor);
+  const target = state.players[action.target] || createPlayerState(action.target);
+
+  if (role === "KNIGHT" || role === "BERSERK" || role === "VALK") return true;
+  if (role === "SIREN") return target.hp <= 3 || target.blockedActions <= 0;
+  if (role === "PIRATE") return target.hp <= 2 || actor.gold <= 1;
+  if (role === "GOBLIN") return target.gold >= 2;
+  if (role === "ANGEL") return Math.abs(actor.hp - actor.gold) >= 2;
+  if (role === "APPRENTICE") {
+    const card = getCardByIndex(action.actor, action.cardIndex);
+    const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
+    return dmg >= 3;
+  }
+  return false;
+}
+
+function updateBeliefsAfterBotAccept(opponentAction) {
+  if (state.mode !== "bot" || !state.ai || !opponentAction || opponentAction.actor !== "human" || opponentAction.kind !== "role") return;
+  const role = String(opponentAction.role || "").toUpperCase();
+  if (!(role in state.ai.beliefRealByRole)) return;
+
+  if (isStrongOpponentClaim(opponentAction)) adjustBeliefRealForRole(role, -0.05);
+  else adjustBeliefRealForRole(role, 0.05);
+
+  if (role === "BANKER" && state.round <= 3) adjustBeliefRealForRole(role, 0.05);
+  if (role === "ANGEL") {
+    const actorState = state.players[opponentAction.actor] || createPlayerState(opponentAction.actor);
+    if (actorState.gold <= 1 || actorState.hp <= 2) adjustBeliefRealForRole(role, -0.1);
+  }
+  if ((role === "KNIGHT" || role === "BERSERK" || role === "SIREN") && (state.players.human.hp <= 2)) {
+    adjustBeliefRealForRole(role, -0.05);
   }
 
-  return top[0].action;
+  const repeatMap = state.ai.repeatUnchallengedByRole || Object.create(null);
+  repeatMap[role] = Math.max(0, Number(repeatMap[role]) || 0) + 1;
+  if (repeatMap[role] > 1) adjustBeliefRealForRole(role, -0.03);
+}
+
+function updateBeliefsAfterBotChallenge(opponentAction, wasReal) {
+  if (state.mode !== "bot" || !state.ai || !opponentAction || opponentAction.actor !== "human" || opponentAction.kind !== "role") return;
+  const role = String(opponentAction.role || "").toUpperCase();
+  if (!(role in state.ai.beliefRealByRole)) return;
+  setBeliefRealForRole(role, wasReal ? 0.9 : 0.1);
+  if (state.ai.repeatUnchallengedByRole && role in state.ai.repeatUnchallengedByRole) {
+    state.ai.repeatUnchallengedByRole[role] = 0;
+  }
+}
+
+function buildBotAiGameState() {
+  const bot = state.players.bot || createPlayerState("bot");
+  const human = state.players.human || createPlayerState("human");
+  return {
+    demonActive: Boolean(state.ai && state.ai.demonActive),
+    botHP: bot.hp,
+    oppHP: human.hp,
+    botGold: bot.gold,
+    oppGold: human.gold,
+    botHasShield: Boolean(bot.shield),
+    roundIndex: Math.max(1, Number(state.round) || 1),
+    remainingRounds: Math.max(0, MATCH_SETTINGS.MAX_ROUNDS - Math.max(1, Number(state.round) || 1) + 1),
+    strikeDamage: getStrikeDamage("bot"),
+    interestGain: getInterestGoldGain("bot"),
+    opponentApprenticeDamageHint: 2
+  };
+}
+
+function buildBotPrivateStateForAi() {
+  const bot = state.players.bot || createPlayerState("bot");
+  const playerModel = state.ai && state.ai.playerModel ? state.ai.playerModel : createPlayerBehaviorStats();
+  const botHand = Array.isArray(bot.cards)
+    ? bot.cards.map((card, index) => ({
+        cardIndex: index,
+        role: String(card && card.role ? card.role : ""),
+        isReal: Boolean(card && card.isReal),
+        cost: getRoleCost(card && card.role ? card.role : "", card),
+        canUse: canUseRoleByUses("bot", card && card.role ? card.role : "")
+      }))
+    : [];
+  return {
+    beliefRealByRole: state.ai && state.ai.beliefRealByRole ? { ...state.ai.beliefRealByRole } : createRoleBeliefMap(0.5),
+    botBluffUsageByRole: state.ai && state.ai.botBluffUsageByRole ? { ...state.ai.botBluffUsageByRole } : createRoleCounterMap(0),
+    playerModel: {
+      challengeOpportunities: playerModel.challengeOpportunities,
+      challenges: playerModel.challenges,
+      bluffsCaught: playerModel.bluffsCaught,
+      turns: playerModel.turns,
+      damageActions: playerModel.damageActions,
+      challengeRate: getPlayerChallengeRate(),
+      playerBluffCaughtRate: getPlayerBluffCaughtRate(),
+      playerAggression: getPlayerAggressionRate()
+    },
+    botHand
+  };
+}
+
+function buildBotPublicStateForAi(legalActions) {
+  const availableActions = (Array.isArray(legalActions) ? legalActions : []).map((action) => ({
+    kind: action.kind === "role" ? "role" : "basic",
+    id: action.kind === "basic" ? action.id : action.role,
+    role: action.kind === "role" ? action.role : null,
+    cardIndex: typeof action.cardIndex === "number" ? action.cardIndex : null,
+    cost: Number(action.cost) || 0,
+    isReal: action.kind === "role" ? Boolean(action.isReal) : null
+  }));
+
+  const knownOppCards = Array.isArray(state.players.human.cards)
+    ? state.players.human.cards.map((card, index) => ({
+        cardIndex: index,
+        role: String(card && card.role ? card.role : ""),
+        verification: card && (card.verification === "REAL" || card.verification === "FAKE") ? card.verification : "UNKNOWN",
+        revealedUsed: Boolean(card && card.revealedUsed)
+      }))
+    : [];
+
+  return { availableActions, knownOppCards };
+}
+
+function normalizeBotAiActionChoice(choice, legalActions) {
+  const legal = Array.isArray(legalActions) ? legalActions : [];
+  if (!choice || typeof choice !== "object") return null;
+  if (choice.kind === "basic") {
+    const basicId = String(choice.id || "").toUpperCase();
+    if (basicId === "INTEREST" || basicId === "STRIKE") return basicId;
+    return null;
+  }
+  if (choice.kind === "role" && typeof choice.cardIndex === "number") {
+    const legalRole = legal.find((action) => action.kind === "role" && action.cardIndex === choice.cardIndex);
+    if (legalRole) return { kind: "card", cardIndex: legalRole.cardIndex };
+  }
+  return null;
+}
+
+function decideBotActionWithModule(legalActions) {
+  if (!window.BotAI || typeof window.BotAI.decideAction !== "function") return null;
+  const gameState = buildBotAiGameState();
+  const botPrivateState = buildBotPrivateStateForAi();
+  const publicState = buildBotPublicStateForAi(legalActions);
+  const choice = window.BotAI.decideAction(gameState, botPrivateState, publicState);
+  return normalizeBotAiActionChoice(choice, legalActions);
+}
+
+function decideBotResponseWithModule(opponentClaim) {
+  if (!window.BotAI || typeof window.BotAI.decideResponseToClaim !== "function") return null;
+  const gameState = buildBotAiGameState();
+  const botPrivateState = buildBotPrivateStateForAi();
+  const publicState = buildBotPublicStateForAi([]);
+  const sanitizedClaim = {
+    kind: "role",
+    id: String(opponentClaim && opponentClaim.role ? opponentClaim.role : ""),
+    role: String(opponentClaim && opponentClaim.role ? opponentClaim.role : ""),
+    cardIndex: typeof opponentClaim?.cardIndex === "number" ? opponentClaim.cardIndex : null,
+    cost: Number(opponentClaim && opponentClaim.cost) || 0
+  };
+  const result = String(
+    window.BotAI.decideResponseToClaim(gameState, botPrivateState, publicState, sanitizedClaim) || "ACCEPT"
+  ).toUpperCase();
+  if (result === "CHALLENGE" || result === "YOU'RE LYING" || result === "YOURE_LYING") return "CHALLENGE";
+  return "ACCEPT";
 }
 
 function botChooseAction() {
@@ -5136,107 +5337,13 @@ function botChooseAction() {
     state.firstMatchGuide.botFirstPlayDone = true;
   }
 
-  const human = state.players.human;
-  const bot = state.players.bot;
+  const moduleChoice = decideBotActionWithModule(legal);
+  if (moduleChoice) return moduleChoice;
 
-  const knightFinisher = legal.find((a) => a.kind === "role" && a.role === "KNIGHT" && human.hp <= 2);
-  if (knightFinisher) return { kind: "card", cardIndex: knightFinisher.cardIndex };
-
-  const strikeFinisher = legal.find((a) => a.kind === "basic" && a.id === "STRIKE" && human.hp <= 1);
-  if (strikeFinisher && !knightFinisher) return "STRIKE";
-
-  if (bot.gold <= 1) {
-    const income = legal.find((a) => a.kind === "basic" && a.id === "INTEREST");
-    const goblin = legal.find((a) => a.kind === "role" && a.role === "GOBLIN");
-    if (goblin && human.gold >= 2 && Math.random() < 0.5) return { kind: "card", cardIndex: goblin.cardIndex };
-    if (income) return "INTEREST";
-  }
-
-  const scored = legal.map((action) => ({ action, score: scoreBotAction(action) })).sort((a, b) => b.score - a.score);
-
-  if (isFirstScriptedBotMatchActive()) {
-    const interest = legal.find((action) => action.kind === "basic" && action.id === "INTEREST");
-    if (interest && Math.random() < 0.82) return "INTEREST";
-    const weakest = scored[scored.length - 1] ? scored[scored.length - 1].action : legal[0];
-    if (weakest) return weakest.kind === "basic" ? weakest.id : { kind: "card", cardIndex: weakest.cardIndex };
-  }
-
-  const bluffRate = getBotBluffRate();
-  const best = scored[0];
-  const fakeCandidates = scored.filter((item) => item.action.kind === "role" && item.action.isReal === false);
-
-  if (best && best.action.kind === "role" && best.action.isReal && fakeCandidates.length > 0 && Math.random() < bluffRate) {
-    const bestFake = fakeCandidates[0];
-    if (bestFake.score >= best.score - 1.3) return { kind: "card", cardIndex: bestFake.action.cardIndex };
-  }
-
-  const picked = chooseWeightedAction(scored);
-  return picked.kind === "basic" ? picked.id : { kind: "card", cardIndex: picked.cardIndex };
-}
-
-function botShouldChallenge(action) {
-  if (!action || action.kind !== "role") return false;
-  if (isFirstScriptedBotMatchActive()) return Math.random() < 0.08;
-  const role = action.role;
-  const suspicion = state.ai.suspicion[role] ?? 0.35;
-  const bot = state.players.bot;
-  const human = state.players.human;
-
-  let preventedSwing = 1;
-  switch (role) {
-    case "KNIGHT":
-      preventedSwing = 2.8;
-      break;
-    case "ENT":
-      preventedSwing = 2.3;
-      break;
-    case "SIREN":
-      preventedSwing = 1.9;
-      break;
-    case "GOBLIN":
-      preventedSwing = 1.4 + (bot.gold <= 1 ? 0.4 : 0);
-      break;
-    case "PIRATE":
-      preventedSwing = 2;
-      break;
-    case "DWARF":
-      preventedSwing = 1.2;
-      break;
-    case "SCIENTIST":
-      preventedSwing = 1.6;
-      break;
-    case "JOKER":
-      preventedSwing = 1.9;
-      break;
-    case "BERSERK":
-      preventedSwing = 2.1;
-      break;
-    case "BANKER":
-      preventedSwing = 1.8;
-      break;
-    case "ANGEL":
-      preventedSwing = 2.2;
-      break;
-    case "VALK":
-      preventedSwing = 2.4;
-      break;
-    case "APPRENTICE": {
-      const card = getCardByIndex("human", action.cardIndex);
-      const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
-      preventedSwing = 1.1 + dmg * 0.7;
-      break;
-    }
-    default:
-      break;
-  }
-
-  if (role === "KNIGHT" && bot.hp <= 2) return true;
-  if (role === "ENT" && human.hp <= 2) preventedSwing += 0.5;
-  if (role === "GOBLIN" && bot.gold === 0) preventedSwing -= 0.6;
-
-  const hpSafety = bot.hp <= 1 ? -1 : bot.hp <= 2 ? -0.4 : 0;
-  const expectedValue = suspicion * preventedSwing - (1 - suspicion) * 1.05 + hpSafety;
-  return expectedValue > 0.12;
+  const fallback = legal.find((action) => action.kind === "basic" && action.id === "INTEREST");
+  if (fallback) return "INTEREST";
+  const first = legal[0];
+  return first.kind === "basic" ? first.id : { kind: "card", cardIndex: first.cardIndex };
 }
 
 async function botTakeTurn() {
@@ -5279,7 +5386,8 @@ async function botRespondToClaim() {
     return;
   }
 
-  if (botShouldChallenge(state.pendingAction)) resolveChallenge();
+  const decision = decideBotResponseWithModule(state.pendingAction);
+  if (decision === "CHALLENGE") resolveChallenge();
   else resolveAccept();
 }
 
@@ -6463,6 +6571,10 @@ function updateUI() {
 
   ui.topNameText.textContent = slotName(topSlot);
   ui.bottomNameText.textContent = slotName(bottomSlot);
+  if (ui.topDemonBadge) {
+    const showDemonBadge = Boolean(state.mode === "bot" && state.ai && state.ai.demonActive && topSlot === "bot");
+    ui.topDemonBadge.classList.toggle("hidden", !showDemonBadge);
+  }
   renderStatsForSlot(ui.topStatsText, topSlot);
   renderStatsForSlot(ui.bottomStatsText, bottomSlot);
 
@@ -7872,6 +7984,7 @@ function cacheElements() {
   ui.topAvatar = document.getElementById("topAvatar");
   ui.bottomAvatar = document.getElementById("bottomAvatar");
   ui.topNameText = document.getElementById("topNameText");
+  ui.topDemonBadge = document.getElementById("topDemonBadge");
   ui.bottomNameText = document.getElementById("bottomNameText");
   ui.topStatsText = document.getElementById("topStatsText");
   ui.bottomStatsText = document.getElementById("bottomStatsText");
@@ -8055,6 +8168,7 @@ function exposeSupabaseTest() {
 async function init() {
   cacheElements();
   state.progression = loadProgressionStateFromStorage();
+  state.matchesPlayedCount = loadMatchesPlayedCountFromStorage();
   state.matchHistory = loadMatchHistoryFromStorage();
   applyAssetCssVariables();
   renderAvatarChoices();

@@ -1005,6 +1005,30 @@ body {
   text-overflow: ellipsis;
 }
 
+.player-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bot-demon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 18px;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: clamp(0.54rem, 1.7vw, 0.64rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffe5e5;
+  background: linear-gradient(180deg, #d64343, #9e1f1f);
+  border: 1px solid rgba(255, 170, 170, 0.55);
+  box-shadow: 0 0 10px rgba(214, 67, 67, 0.4);
+}
+
 .player-stats {
   margin: 0;
   font-size: var(--fs-sm);

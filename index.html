@@ -176,7 +176,10 @@
             ></span>
             <div class="player-name-block">
               <p class="hero-context-label">Opponent Hero</p>
-              <h3 id="topNameText" class="player-name">Opponent</h3>
+              <div class="player-name-row">
+                <h3 id="topNameText" class="player-name">Opponent</h3>
+                <span id="topDemonBadge" class="bot-demon-badge hidden" aria-label="Demon Bot active">DEMON</span>
+              </div>
             </div>
             <p id="topStatsText" class="player-stats">HP: 5 | Gold: 2</p>
           </div>
@@ -581,6 +584,7 @@ STRIKE -> 1 damage (2 Gold)
   </section>
 
   <script src="supabase-public-config.js"></script>
+  <script src="bot_ai.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
