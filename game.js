@@ -41,21 +41,38 @@ const MATCH_SETTINGS = Object.freeze({
   MAX_EVENT_ENTRIES: 200
 });
 
+const ROLE_DESCRIPTION_COPY = Object.freeze({
+  KNIGHT: "2 ⚔",
+  GOBLIN: "Steal 1 🪙 (3 uses)",
+  SIREN: "1 ⚔ • Skip enemy action",
+  ELF: "1 ⚔ • Enemy cost +1",
+  ENT: "+2 ❤️",
+  DWARF: "Gain 🛡",
+  BERSERK: "Self -1 ❤️ • 2 ⚔",
+  VALK: "1 ⚔ • +1 ❤️",
+  SCIENTIST: "+1 🪙 • Reveal enemy card",
+  BANKER: "+1 🪙 / round",
+  PIRATE: "1 ⚔ • +1 🪙",
+  APPRENTICE: "⚔ increases each round",
+  ANGEL: "Swap ❤️ ↔ 🪙",
+  JOKER: "1 ⚔ • Transform"
+});
+
 const ROLE_CONFIG = Object.freeze({
-  SIREN: Object.freeze({ name: "SIREN", cost: 2, description: "1 DMG + skip next action", passive: false }),
-  DWARF: Object.freeze({ name: "DWARF", cost: 1, description: "Shield next DMG", passive: false }),
-  KNIGHT: Object.freeze({ name: "KNIGHT", cost: 2, description: "2 DMG", passive: false }),
-  GOBLIN: Object.freeze({ name: "GOBLIN", cost: 0, description: "Steal 1 Gold", maxUses: 3, passive: false }),
-  ENT: Object.freeze({ name: "ENT", cost: 2, description: "+2 HP", passive: false }),
-  ELF: Object.freeze({ name: "ELF", cost: 2, description: "DMG 1\nEnemy cost +1", passive: false }),
-  PIRATE: Object.freeze({ name: "PIRATE", cost: 0, description: "1 DMG +1 Gold", maxUses: 2, passive: false }),
-  SCIENTIST: Object.freeze({ name: "SCIENTIST", cost: 0, description: "+1 Gold + reveal unknown card", maxUses: 2, passive: false }),
-  JOKER: Object.freeze({ name: "JOKER", cost: 1, description: "1 DMG then transform", passive: false }),
-  BERSERK: Object.freeze({ name: "BERSERK", cost: 0, description: "Self -1 HP enemy -2 HP", passive: false }),
-  BANKER: Object.freeze({ name: "BANKER", cost: 3, description: "+1 Gold / round", passive: false }),
-  ANGEL: Object.freeze({ name: "ANGEL", cost: 0, description: "Swap HP and Gold", maxUses: 1, passive: false }),
-  VALK: Object.freeze({ name: "VALK", cost: 3, description: "Deal 1 DMG + self +1 HP", passive: false }),
-  APPRENTICE: Object.freeze({ name: "APPRENTICE", cost: 2, description: "Scales each round", passive: false, apprentice: true })
+  SIREN: Object.freeze({ name: "SIREN", cost: 2, description: ROLE_DESCRIPTION_COPY.SIREN, passive: false }),
+  DWARF: Object.freeze({ name: "DWARF", cost: 1, description: ROLE_DESCRIPTION_COPY.DWARF, passive: false }),
+  KNIGHT: Object.freeze({ name: "KNIGHT", cost: 2, description: ROLE_DESCRIPTION_COPY.KNIGHT, passive: false }),
+  GOBLIN: Object.freeze({ name: "GOBLIN", cost: 0, description: ROLE_DESCRIPTION_COPY.GOBLIN, maxUses: 3, passive: false }),
+  ENT: Object.freeze({ name: "ENT", cost: 2, description: ROLE_DESCRIPTION_COPY.ENT, passive: false }),
+  ELF: Object.freeze({ name: "ELF", cost: 2, description: ROLE_DESCRIPTION_COPY.ELF, passive: false }),
+  PIRATE: Object.freeze({ name: "PIRATE", cost: 0, description: ROLE_DESCRIPTION_COPY.PIRATE, maxUses: 2, passive: false }),
+  SCIENTIST: Object.freeze({ name: "SCIENTIST", cost: 0, description: ROLE_DESCRIPTION_COPY.SCIENTIST, maxUses: 2, passive: false }),
+  JOKER: Object.freeze({ name: "JOKER", cost: 1, description: ROLE_DESCRIPTION_COPY.JOKER, passive: false }),
+  BERSERK: Object.freeze({ name: "BERSERK", cost: 0, description: ROLE_DESCRIPTION_COPY.BERSERK, passive: false }),
+  BANKER: Object.freeze({ name: "BANKER", cost: 3, description: ROLE_DESCRIPTION_COPY.BANKER, passive: false }),
+  ANGEL: Object.freeze({ name: "ANGEL", cost: 0, description: ROLE_DESCRIPTION_COPY.ANGEL, maxUses: 1, passive: false }),
+  VALK: Object.freeze({ name: "VALK", cost: 3, description: ROLE_DESCRIPTION_COPY.VALK, passive: false }),
+  APPRENTICE: Object.freeze({ name: "APPRENTICE", cost: 2, description: ROLE_DESCRIPTION_COPY.APPRENTICE, passive: false, apprentice: true })
 });
 
 const BASIC_ACTIONS = Object.freeze({
@@ -299,20 +316,20 @@ const PROGRESSION_REWARD_BY_ID = Object.freeze(
 );
 
 const ROLE_COLLECTION_META = Object.freeze({
-  SIREN: Object.freeze({ name: "Siren", description: "Deal 1 damage and skip opponent next action." }),
-  DWARF: Object.freeze({ name: "Dwarf", description: "Gain Shield for the next damage." }),
-  KNIGHT: Object.freeze({ name: "Knight", description: "Deal 2 damage." }),
-  GOBLIN: Object.freeze({ name: "Goblin", description: "Steal 1 Gold (max 3 uses)." }),
-  ENT: Object.freeze({ name: "Ent", description: "Heal 2 HP." }),
-  ELF: Object.freeze({ name: "Elf", description: "DMG 1\nEnemy cost +1" }),
-  PIRATE: Object.freeze({ name: "Pirate", description: "Deal 1 damage and gain 1 Gold." }),
-  SCIENTIST: Object.freeze({ name: "Scientist", description: "Gain 1 Gold and reveal one unknown opponent card." }),
-  JOKER: Object.freeze({ name: "Joker", description: "Deal 1 damage, then transform into another card." }),
-  BERSERK: Object.freeze({ name: "Berserker", description: "Self -1 HP, opponent -2 HP." }),
-  BANKER: Object.freeze({ name: "Banker", description: "Activate +1 Gold at the start of each round." }),
-  ANGEL: Object.freeze({ name: "Angel", description: "Swap your HP and Gold." }),
-  VALK: Object.freeze({ name: "Valkyrie", description: "Deal 1 damage and gain 1 HP." }),
-  APPRENTICE: Object.freeze({ name: "Adept", description: "Damage and cost scale each round." })
+  SIREN: Object.freeze({ name: "Siren", description: ROLE_DESCRIPTION_COPY.SIREN }),
+  DWARF: Object.freeze({ name: "Dwarf", description: ROLE_DESCRIPTION_COPY.DWARF }),
+  KNIGHT: Object.freeze({ name: "Knight", description: ROLE_DESCRIPTION_COPY.KNIGHT }),
+  GOBLIN: Object.freeze({ name: "Goblin", description: ROLE_DESCRIPTION_COPY.GOBLIN }),
+  ENT: Object.freeze({ name: "Ent", description: ROLE_DESCRIPTION_COPY.ENT }),
+  ELF: Object.freeze({ name: "Elf", description: ROLE_DESCRIPTION_COPY.ELF }),
+  PIRATE: Object.freeze({ name: "Pirate", description: ROLE_DESCRIPTION_COPY.PIRATE }),
+  SCIENTIST: Object.freeze({ name: "Scientist", description: ROLE_DESCRIPTION_COPY.SCIENTIST }),
+  JOKER: Object.freeze({ name: "Joker", description: ROLE_DESCRIPTION_COPY.JOKER }),
+  BERSERK: Object.freeze({ name: "Berserker", description: ROLE_DESCRIPTION_COPY.BERSERK }),
+  BANKER: Object.freeze({ name: "Banker", description: ROLE_DESCRIPTION_COPY.BANKER }),
+  ANGEL: Object.freeze({ name: "Angel", description: ROLE_DESCRIPTION_COPY.ANGEL }),
+  VALK: Object.freeze({ name: "Valkyrie", description: ROLE_DESCRIPTION_COPY.VALK }),
+  APPRENTICE: Object.freeze({ name: "Adept", description: ROLE_DESCRIPTION_COPY.APPRENTICE })
 });
 
 const MAX_PROGRESS_POINTS = LEAGUE_SEGMENTS[LEAGUE_SEGMENTS.length - 1].basePoints + 100;
@@ -533,20 +550,20 @@ const BOT_IDENTITIES = Object.freeze([
 ]);
 
 const RULES_ROLE_DETAILS = Object.freeze([
-  Object.freeze({ role: "SIREN", text: "1 damage + skip opponent next action (2 Gold)" }),
-  Object.freeze({ role: "DWARF", text: "Shield next damage (1 Gold)" }),
-  Object.freeze({ role: "KNIGHT", text: "2 damage (2 Gold)" }),
-  Object.freeze({ role: "GOBLIN", text: "Steal 1 Gold (max 3)" }),
-  Object.freeze({ role: "ENT", text: "Heal 2 HP (2 Gold)" }),
-  Object.freeze({ role: "PIRATE", text: "1 damage +1 Gold (max 2)" }),
-  Object.freeze({ role: "ELF", text: "DMG 1 / Enemy cost +1 (2 Gold)" }),
-  Object.freeze({ role: "SCIENTIST", text: "+1 Gold + reveal one unknown card (max 2)" }),
-  Object.freeze({ role: "JOKER", text: "1 damage (1 Gold), then transforms" }),
-  Object.freeze({ role: "BERSERK", text: "Self -1 HP, enemy -2 HP" }),
-  Object.freeze({ role: "BANKER", text: "Activate +1 Gold / round buff (2 Gold)" }),
-  Object.freeze({ role: "ANGEL", text: "Swap HP and Gold (0 Gold, max 1)" }),
-  Object.freeze({ role: "VALK", text: "Deal 1 damage, self +1 HP (3 Gold)" }),
-  Object.freeze({ role: "APPRENTICE", label: "ADEPT", text: "X damage, cost X+1, scales each round (cap 5/6)" })
+  Object.freeze({ role: "SIREN", text: ROLE_DESCRIPTION_COPY.SIREN }),
+  Object.freeze({ role: "DWARF", text: ROLE_DESCRIPTION_COPY.DWARF }),
+  Object.freeze({ role: "KNIGHT", text: ROLE_DESCRIPTION_COPY.KNIGHT }),
+  Object.freeze({ role: "GOBLIN", text: ROLE_DESCRIPTION_COPY.GOBLIN }),
+  Object.freeze({ role: "ENT", text: ROLE_DESCRIPTION_COPY.ENT }),
+  Object.freeze({ role: "PIRATE", text: ROLE_DESCRIPTION_COPY.PIRATE }),
+  Object.freeze({ role: "ELF", text: ROLE_DESCRIPTION_COPY.ELF }),
+  Object.freeze({ role: "SCIENTIST", text: ROLE_DESCRIPTION_COPY.SCIENTIST }),
+  Object.freeze({ role: "JOKER", text: ROLE_DESCRIPTION_COPY.JOKER }),
+  Object.freeze({ role: "BERSERK", text: ROLE_DESCRIPTION_COPY.BERSERK }),
+  Object.freeze({ role: "BANKER", text: ROLE_DESCRIPTION_COPY.BANKER }),
+  Object.freeze({ role: "ANGEL", text: ROLE_DESCRIPTION_COPY.ANGEL }),
+  Object.freeze({ role: "VALK", text: ROLE_DESCRIPTION_COPY.VALK }),
+  Object.freeze({ role: "APPRENTICE", label: "ADEPT", text: ROLE_DESCRIPTION_COPY.APPRENTICE })
 ]);
 
 const ui = {};
@@ -1967,101 +1984,7 @@ function appendText(node, text) {
 
 function renderRoleDescription(node, role, card = null) {
   if (!node) return;
-  node.textContent = "";
-  node.classList.remove("card-desc-elf");
-
-  const icon = (key) => {
-    const image = createInlineIcon(key);
-    if (image) node.appendChild(image);
-  };
-
-  switch (role) {
-    case "SIREN":
-      appendText(node, "1 ");
-      icon("sword");
-      appendText(node, " + skip next action");
-      break;
-    case "DWARF":
-      icon("shield");
-      appendText(node, " Shield next ");
-      icon("sword");
-      appendText(node, " DMG");
-      break;
-    case "KNIGHT":
-      appendText(node, "2 ");
-      icon("sword");
-      appendText(node, " DMG");
-      break;
-    case "GOBLIN":
-      appendText(node, "Steal 1 ");
-      icon("gold");
-      break;
-    case "ENT":
-      appendText(node, "+2 ");
-      icon("hp");
-      break;
-    case "ELF":
-      node.classList.add("card-desc-elf");
-      {
-        const lineOne = document.createElement("span");
-        lineOne.className = "card-desc-elf-line";
-        lineOne.textContent = "DMG 1";
-        const lineTwo = document.createElement("span");
-        lineTwo.className = "card-desc-elf-line";
-        lineTwo.textContent = "Enemy cost +1";
-        node.appendChild(lineOne);
-        node.appendChild(lineTwo);
-      }
-      break;
-    case "PIRATE":
-      appendText(node, "1 ");
-      icon("sword");
-      appendText(node, " +1 ");
-      icon("gold");
-      break;
-    case "SCIENTIST":
-      appendText(node, "+1 ");
-      icon("gold");
-      appendText(node, " + reveal");
-      break;
-    case "JOKER":
-      appendText(node, "1 ");
-      icon("sword");
-      appendText(node, " then transform");
-      break;
-    case "BERSERK":
-      appendText(node, "Self -1 ");
-      icon("hp");
-      appendText(node, " enemy -2 ");
-      icon("hp");
-      break;
-    case "BANKER":
-      appendText(node, "+1 ");
-      icon("gold");
-      appendText(node, " / round");
-      break;
-    case "ANGEL":
-      appendText(node, "Swap ");
-      icon("hp");
-      appendText(node, " and ");
-      icon("gold");
-      break;
-    case "VALK":
-      appendText(node, "1 ");
-      icon("sword");
-      appendText(node, " + self +1 ");
-      icon("hp");
-      break;
-    case "APPRENTICE": {
-      const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
-      appendText(node, `${dmg} `);
-      icon("sword");
-      break;
-    }
-    default:
-      appendText(node, "Skip next turn");
-      break;
-  }
+  node.textContent = getRoleEffectSummary(role, card);
 }
 
 function setActionDescriptions() {
@@ -2739,13 +2662,8 @@ function getRoleCost(role, card) {
 }
 
 function getRoleEffectSummary(role, card) {
-  if (role === "APPRENTICE") {
-    const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
-    const cost = getRoleCost(role, card);
-    return `${dmg} DMG (cost ${cost})`;
-  }
   const meta = getRoleMeta(role);
-  return meta ? meta.description : "";
+  return meta ? String(meta.description || "") : "";
 }
 
 function deterministicPickIndex(length, context) {
