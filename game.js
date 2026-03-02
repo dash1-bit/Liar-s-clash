@@ -43,19 +43,19 @@ const MATCH_SETTINGS = Object.freeze({
 
 const ROLE_DESCRIPTION_COPY = Object.freeze({
   KNIGHT: "2 ⚔",
-  GOBLIN: "Steal 1 🪙 (3 uses)",
-  SIREN: "1 ⚔ • Skip enemy action",
-  ELF: "1 ⚔ • Enemy cost +1",
+  GOBLIN: "Steal 1 🪙",
+  SIREN: "1 ⚔ · skip next action",
+  ELF: "1 ⚔ · enemy 🪙 cost +1",
   ENT: "+2 ❤️",
-  DWARF: "Gain 🛡",
-  BERSERK: "Self -1 ❤️ • 2 ⚔",
-  VALK: "1 ⚔ • +1 ❤️",
-  SCIENTIST: "+1 🪙 • Reveal enemy card",
+  DWARF: "Gain 🛡 (blocks next ⚔)",
+  BERSERK: "Self -1 ❤️ · 2 ⚔",
+  VALK: "1 ⚔ · +1 ❤️",
+  SCIENTIST: "+1 🪙 · reveal enemy card",
   BANKER: "+1 🪙 / round",
-  PIRATE: "1 ⚔ • +1 🪙",
-  APPRENTICE: "⚔ increases each round",
+  PIRATE: "1 ⚔ · +1 🪙",
+  APPRENTICE: "1 ⚔ · ⚔ + 🪙 increase each round",
   ANGEL: "Swap ❤️ ↔ 🪙",
-  JOKER: "1 ⚔ • Transform"
+  JOKER: "1 ⚔ · Transform"
 });
 
 const ROLE_CONFIG = Object.freeze({
@@ -117,31 +117,31 @@ const HERO_REGISTRY = Object.freeze({
   adventurer: Object.freeze({
     id: "adventurer",
     displayName: "Adventurer",
-    shortDescription: "Interest gives +2 Gold instead of +1.",
+    shortDescription: "Interest gives +2 🪙 instead of +1.",
     portraitPath: ASSET_MAP.heroPortraitPaths.adventurer
   }),
   noble: Object.freeze({
     id: "noble",
     displayName: "Noble",
-    shortDescription: "Basic Strike deals 2 damage.",
+    shortDescription: "Basic Strike deals +1 ⚔.",
     portraitPath: ASSET_MAP.heroPortraitPaths.noble
   }),
   rogue: Object.freeze({
     id: "rogue",
     displayName: "Rogue",
-    shortDescription: "First turn: optional 0-4 card swap.",
+    shortDescription: "First turn: optional 0–4 card swap.",
     portraitPath: ASSET_MAP.heroPortraitPaths.rogue
   }),
   guardian: Object.freeze({
     id: "guardian",
     displayName: "Guardian",
-    shortDescription: "Gain Shield at round 1 and round 6.",
+    shortDescription: "Gain 🛡 at round 1 and round 6.",
     portraitPath: ASSET_MAP.heroPortraitPaths.guardian
   }),
   oracle: Object.freeze({
     id: "oracle",
     displayName: "Oracle",
-    shortDescription: "Start with 3 REAL cards and 1 BLUFF.",
+    shortDescription: "Start with 3 REAL and 1 BLUFF.",
     portraitPath: ASSET_MAP.heroPortraitPaths.oracle
   })
 });
@@ -150,12 +150,12 @@ const GAME_EVENT_REGISTRY = Object.freeze({
   none: Object.freeze({
     id: "none",
     name: "No Event",
-    description: "Standard rules."
+    description: "Standard match rules."
   }),
   extra_hp: Object.freeze({
     id: "extra_hp",
     name: "+1 Starting HP",
-    description: "Both players start with 6 HP instead of 5."
+    description: "Both players start with 6 ❤️ instead of 5."
   }),
   mirror_hands: Object.freeze({
     id: "mirror_hands",
@@ -165,12 +165,12 @@ const GAME_EVENT_REGISTRY = Object.freeze({
   gold_per_round: Object.freeze({
     id: "gold_per_round",
     name: "+1 Gold per Round",
-    description: "Both players gain +1 extra Gold each round."
+    description: "Both players gain +1 🪙 each round."
   }),
   hidden_cards: Object.freeze({
     id: "hidden_cards",
     name: "Fog of War",
-    description: "You cannot see opponent cards until they are played."
+    description: "Opponent cards stay hidden until played."
   })
 });
 
@@ -317,9 +317,9 @@ const PROGRESSION_REWARD_BY_ID = Object.freeze(
 
 const ROLE_COLLECTION_META = Object.freeze({
   SIREN: Object.freeze({ name: "Siren", description: ROLE_DESCRIPTION_COPY.SIREN }),
-  DWARF: Object.freeze({ name: "Dwarf", description: ROLE_DESCRIPTION_COPY.DWARF }),
+  DWARF: Object.freeze({ name: "Dwarf", description: "Gain a Shield 🛡 that blocks the next damage." }),
   KNIGHT: Object.freeze({ name: "Knight", description: ROLE_DESCRIPTION_COPY.KNIGHT }),
-  GOBLIN: Object.freeze({ name: "Goblin", description: ROLE_DESCRIPTION_COPY.GOBLIN }),
+  GOBLIN: Object.freeze({ name: "Goblin", description: "Steal 1 Gold 🪙 from the opponent." }),
   ENT: Object.freeze({ name: "Ent", description: ROLE_DESCRIPTION_COPY.ENT }),
   ELF: Object.freeze({ name: "Elf", description: ROLE_DESCRIPTION_COPY.ELF }),
   PIRATE: Object.freeze({ name: "Pirate", description: ROLE_DESCRIPTION_COPY.PIRATE }),
@@ -329,7 +329,7 @@ const ROLE_COLLECTION_META = Object.freeze({
   BANKER: Object.freeze({ name: "Banker", description: ROLE_DESCRIPTION_COPY.BANKER }),
   ANGEL: Object.freeze({ name: "Angel", description: ROLE_DESCRIPTION_COPY.ANGEL }),
   VALK: Object.freeze({ name: "Valkyrie", description: ROLE_DESCRIPTION_COPY.VALK }),
-  APPRENTICE: Object.freeze({ name: "Adept", description: ROLE_DESCRIPTION_COPY.APPRENTICE })
+  APPRENTICE: Object.freeze({ name: "Adept", description: "Starts 1 ⚔. ⚔ + 🪙 increase each round." })
 });
 
 const MAX_PROGRESS_POINTS = LEAGUE_SEGMENTS[LEAGUE_SEGMENTS.length - 1].basePoints + 100;
