@@ -41,21 +41,28 @@ const MATCH_SETTINGS = Object.freeze({
   MAX_EVENT_ENTRIES: 200
 });
 
+const ICON_TOKEN_REGEX = /(\{GOLD\}|\{SWORD\}|\{SHIELD\}|\{HEART\}|\{UP\})/g;
+const ICON_DEFAULT_SIZES = Object.freeze({
+  text: 14,
+  badge: 18,
+  stat: 22
+});
+
 const ROLE_DESCRIPTION_COPY = Object.freeze({
-  KNIGHT: "2 ⚔",
-  GOBLIN: "Steal 1 🪙",
-  SIREN: "1 ⚔ · skip next action",
-  ELF: "1 ⚔ · enemy 🪙 cost +1",
-  ENT: "+2 ❤️",
-  DWARF: "Gain 🛡 (blocks next ⚔)",
-  BERSERK: "Self -1 ❤️ · 2 ⚔",
-  VALK: "1 ⚔ · +1 ❤️",
-  SCIENTIST: "+1 🪙 · reveal enemy card",
-  BANKER: "+1 🪙 / round",
-  PIRATE: "1 ⚔ · +1 🪙",
-  APPRENTICE: "⚔ + 🪙 each round",
-  ANGEL: "Swap ❤️ ↔ 🪙",
-  JOKER: "1 ⚔ · Transform"
+  KNIGHT: "2 {SWORD}",
+  GOBLIN: "Steal 1 {GOLD}",
+  SIREN: "1 {SWORD} · skip next action",
+  ELF: "1 {SWORD} · enemy {GOLD} cost +1",
+  ENT: "+2 {HEART}",
+  DWARF: "Gain {SHIELD} (blocks next {SWORD})",
+  BERSERK: "Self -1 {HEART} · 2 {SWORD}",
+  VALK: "1 {SWORD} · +1 {HEART}",
+  SCIENTIST: "+1 {GOLD} · reveal enemy card",
+  BANKER: "+1 {GOLD} / round",
+  PIRATE: "1 {SWORD} · +1 {GOLD}",
+  APPRENTICE: "{SWORD} + {GOLD} each round",
+  ANGEL: "Swap {HEART} and {GOLD}",
+  JOKER: "1 {SWORD} · Transform"
 });
 
 const ROLE_CONFIG = Object.freeze({
@@ -117,13 +124,13 @@ const HERO_REGISTRY = Object.freeze({
   adventurer: Object.freeze({
     id: "adventurer",
     displayName: "Adventurer",
-    shortDescription: "Interest gives +2 🪙 instead of +1.",
+    shortDescription: "Interest gives +2 {GOLD} instead of +1.",
     portraitPath: ASSET_MAP.heroPortraitPaths.adventurer
   }),
   noble: Object.freeze({
     id: "noble",
     displayName: "Noble",
-    shortDescription: "Basic Strike deals +1 ⚔.",
+    shortDescription: "Basic Strike deals +1 {SWORD}.",
     portraitPath: ASSET_MAP.heroPortraitPaths.noble
   }),
   rogue: Object.freeze({
@@ -135,7 +142,7 @@ const HERO_REGISTRY = Object.freeze({
   guardian: Object.freeze({
     id: "guardian",
     displayName: "Guardian",
-    shortDescription: "Gain 🛡 at round 1 and round 6.",
+    shortDescription: "Gain {SHIELD} at round 1 and round 6.",
     portraitPath: ASSET_MAP.heroPortraitPaths.guardian
   }),
   oracle: Object.freeze({
@@ -155,7 +162,7 @@ const GAME_EVENT_REGISTRY = Object.freeze({
   extra_hp: Object.freeze({
     id: "extra_hp",
     name: "+1 Starting HP",
-    description: "Both players start with 6 ❤️ instead of 5."
+    description: "Both players start with 6 {HEART} instead of 5."
   }),
   mirror_hands: Object.freeze({
     id: "mirror_hands",
@@ -165,7 +172,7 @@ const GAME_EVENT_REGISTRY = Object.freeze({
   gold_per_round: Object.freeze({
     id: "gold_per_round",
     name: "+1 Gold per Round",
-    description: "Both players gain +1 🪙 each round."
+    description: "Both players gain +1 {GOLD} each round."
   }),
   hidden_cards: Object.freeze({
     id: "hidden_cards",
@@ -317,9 +324,9 @@ const PROGRESSION_REWARD_BY_ID = Object.freeze(
 
 const ROLE_COLLECTION_META = Object.freeze({
   SIREN: Object.freeze({ name: "Siren", description: ROLE_DESCRIPTION_COPY.SIREN }),
-  DWARF: Object.freeze({ name: "Dwarf", description: "Gain a Shield 🛡 that blocks the next damage." }),
+  DWARF: Object.freeze({ name: "Dwarf", description: "Gain a Shield {SHIELD} that blocks the next damage." }),
   KNIGHT: Object.freeze({ name: "Knight", description: ROLE_DESCRIPTION_COPY.KNIGHT }),
-  GOBLIN: Object.freeze({ name: "Goblin", description: "Steal 1 Gold 🪙 from the opponent." }),
+  GOBLIN: Object.freeze({ name: "Goblin", description: "Steal 1 Gold {GOLD} from the opponent." }),
   ENT: Object.freeze({ name: "Ent", description: ROLE_DESCRIPTION_COPY.ENT }),
   ELF: Object.freeze({ name: "Elf", description: ROLE_DESCRIPTION_COPY.ELF }),
   PIRATE: Object.freeze({ name: "Pirate", description: ROLE_DESCRIPTION_COPY.PIRATE }),
@@ -447,7 +454,7 @@ const FIRST_MATCH_GUIDE_STEPS = Object.freeze([
   Object.freeze({
     id: "gold",
     title: "This is your Gold",
-    body: "Spend Gold to play cards and actions.",
+    body: "Spend {GOLD} to play cards and actions.",
     button: "Next",
     spotlightSelectors: Object.freeze(["#bottomPanel .stat-segment-gold"])
   }),
@@ -468,7 +475,7 @@ const FIRST_MATCH_GUIDE_STEPS = Object.freeze([
   Object.freeze({
     id: "bluff-cards",
     title: "Your BLUFF cards",
-    body: "Careful: if you play a BLUFF and your opponent catches it, you lose 2 HP.",
+    body: "Careful: if you play a BLUFF and your opponent catches it, you lose 2 {HEART}.",
     button: "Next",
     spotlightKind: "bluff-cards"
   }),
@@ -483,7 +490,7 @@ const FIRST_MATCH_GUIDE_STEPS = Object.freeze([
 
 const FIRST_MATCH_DECISION_OVERLAY = Object.freeze({
   title: "Accept or call BLUFF?",
-  body: "Your opponent played a card.\nTap ACCEPT to take the effect...\nor tap YOU'RE LYING! to challenge.\nCatch a BLUFF: they lose 2 HP.\nWrong accuse: you lose 1 HP.",
+  body: "Your opponent played a card.\nTap ACCEPT to take the effect...\nor tap YOU'RE LYING! to challenge.\nCatch a BLUFF: they lose 2 {HEART}.\nWrong accuse: you lose 1 {HEART}.",
   button: "Choose"
 });
 
@@ -526,12 +533,12 @@ const TUTORIAL_STEPS = Object.freeze([
     focus: "decision"
   }),
   Object.freeze({
-    text: "If they catch a lie, you lose 2 HP. If they're wrong, they lose 1 HP.",
+    text: "If they catch a lie, you lose 2 {HEART}. If they're wrong, they lose 1 {HEART}.",
     button: "Next",
     focus: "outcome"
   }),
   Object.freeze({
-    text: "Reduce HP or outscore with Gold after 10 rounds.",
+    text: "Reduce {HEART} or outscore with {GOLD} after 10 rounds.",
     button: "Got it",
     focus: "none"
   })
@@ -565,6 +572,42 @@ const RULES_ROLE_DETAILS = Object.freeze([
   Object.freeze({ role: "VALK", text: ROLE_DESCRIPTION_COPY.VALK }),
   Object.freeze({ role: "APPRENTICE", label: "ADEPT", text: ROLE_DESCRIPTION_COPY.APPRENTICE })
 ]);
+
+const RULES_SUMMARY_COPY = Object.freeze([
+  "=== GAMBIT LIAR'S - QUICK RULES ===",
+  "",
+  "Goal:",
+  "Reduce opponent HP to 0.",
+  "",
+  "Hero powers:",
+  "Each hero has a passive power.",
+  "Rogue swaps 0-4 cards only on their first turn.",
+  "",
+  "Turn order:",
+  "Each round has 2 actions (one per player).",
+  "At turn start, the acting player is:",
+  "1) Lower HP",
+  "2) If tied -> higher Gold",
+  "3) If tied -> alternate",
+  "",
+  "Bluff system:",
+  "Play any of your 4 cards (REAL or BLUFF).",
+  "Opponent must ACCEPT or YOU'RE LYING!.",
+  "",
+  "You're lying! resolution:",
+  "If role was REAL -> caller loses 1 HP, effect applies.",
+  "If role was BLUFF -> actor loses 2 HP, effect canceled.",
+  "ELF -> 1 {SWORD} · enemy {GOLD} cost +1",
+  "",
+  "Characters:",
+  "See card list below.",
+  "",
+  "Basic:",
+  "INTEREST -> +1 {GOLD}",
+  "STRIKE -> 1 damage (2 {GOLD})",
+  "",
+  "==="
+].join("\n"));
 
 const ui = {};
 const uiRuntime = {
@@ -1967,19 +2010,106 @@ function formatChallengeOutcome(isReal, actor, challenger) {
   return `Lie caught -> ${slotName(actor)} -2 HP`;
 }
 
-function createInlineIcon(iconKey, className = "inline-icon") {
+function appendText(node, text) {
+  node.appendChild(document.createTextNode(String(text || "")));
+}
+
+function createIconImage(iconKey, { className = "inline-icon", size = ICON_DEFAULT_SIZES.text } = {}) {
   const iconPath = ASSET_MAP.iconPaths[iconKey];
   if (!iconPath) return null;
+  const iconSize = Math.max(8, Number(size) || ICON_DEFAULT_SIZES.text);
   const img = document.createElement("img");
   img.className = className;
   img.src = withAssetVersion(iconPath);
   img.alt = "";
+  img.width = iconSize;
+  img.height = iconSize;
   img.setAttribute("aria-hidden", "true");
   return img;
 }
 
-function appendText(node, text) {
-  node.appendChild(document.createTextNode(String(text || "")));
+function GoldIcon({ className = "inline-icon", size = ICON_DEFAULT_SIZES.text } = {}) {
+  return createIconImage("gold", { className, size });
+}
+
+function SwordIcon({ className = "inline-icon", size = ICON_DEFAULT_SIZES.text } = {}) {
+  return createIconImage("sword", { className, size });
+}
+
+function ShieldIcon({ className = "inline-icon", size = ICON_DEFAULT_SIZES.text } = {}) {
+  return createIconImage("shield", { className, size });
+}
+
+function HeartIcon({ className = "inline-icon", size = ICON_DEFAULT_SIZES.text } = {}) {
+  return createIconImage("hp", { className, size });
+}
+
+function UpArrowIcon({ className = "inline-icon card-desc-up-arrow", size = ICON_DEFAULT_SIZES.text } = {}) {
+  const iconSize = Math.max(8, Number(size) || ICON_DEFAULT_SIZES.text);
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", className);
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", String(iconSize));
+  svg.setAttribute("height", String(iconSize));
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M12 3.8L19 11h-4.1v9H9.1v-9H5z");
+  path.setAttribute("fill", "currentColor");
+  svg.appendChild(path);
+  return svg;
+}
+
+function createIconByKey(iconKey, { className = "inline-icon", size = ICON_DEFAULT_SIZES.text } = {}) {
+  const normalized = String(iconKey || "").toLowerCase().trim();
+  if (normalized === "gold") return GoldIcon({ className, size });
+  if (normalized === "sword" || normalized === "damage") return SwordIcon({ className, size });
+  if (normalized === "shield") return ShieldIcon({ className, size });
+  if (normalized === "heart" || normalized === "hp") return HeartIcon({ className, size });
+  if (normalized === "up") return UpArrowIcon({ className, size });
+  return null;
+}
+
+function createTokenIcon(token, { iconClassName = "inline-icon", iconSize = ICON_DEFAULT_SIZES.text } = {}) {
+  const normalizedToken = String(token || "").trim().toUpperCase();
+  if (normalizedToken === "{GOLD}") return GoldIcon({ className: iconClassName, size: iconSize });
+  if (normalizedToken === "{SWORD}") return SwordIcon({ className: iconClassName, size: iconSize });
+  if (normalizedToken === "{SHIELD}") return ShieldIcon({ className: iconClassName, size: iconSize });
+  if (normalizedToken === "{HEART}") return HeartIcon({ className: iconClassName, size: iconSize });
+  if (normalizedToken === "{UP}") return UpArrowIcon({ className: `${iconClassName} card-desc-up-arrow`, size: iconSize });
+  return null;
+}
+
+function appendTokenizedText(node, text, options = {}) {
+  if (!node) return;
+  const parts = String(text || "").split(ICON_TOKEN_REGEX);
+  parts.forEach((part) => {
+    if (!part) return;
+    const icon = createTokenIcon(part, options);
+    if (icon) {
+      node.appendChild(icon);
+      return;
+    }
+    appendText(node, part);
+  });
+}
+
+function renderTokenizedText(node, text, options = {}) {
+  if (!node) return;
+  node.textContent = "";
+  appendTokenizedText(node, text, options);
+}
+
+function createGoldCostBadge(amount, className = "card-badge card-cost") {
+  const badge = document.createElement("span");
+  badge.className = className;
+  const icon = GoldIcon({ className: "cost-icon", size: ICON_DEFAULT_SIZES.badge });
+  if (icon) badge.appendChild(icon);
+  const value = document.createElement("span");
+  value.className = "cost-value";
+  value.textContent = String(amount);
+  badge.appendChild(value);
+  return badge;
 }
 
 function renderRoleDescription(node, role, card = null) {
@@ -1989,15 +2119,10 @@ function renderRoleDescription(node, role, card = null) {
   if (role === "APPRENTICE") {
     const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
     node.classList.add("card-desc-adept");
-    appendText(node, `${dmg} ⚔ · `);
-    const upArrow = document.createElement("span");
-    upArrow.className = "card-desc-up-arrow";
-    upArrow.textContent = "↑";
-    node.appendChild(upArrow);
-    appendText(node, " each round");
+    renderTokenizedText(node, `${dmg} {SWORD} · {UP} each round`);
     return;
   }
-  node.textContent = getRoleEffectSummary(role, card);
+  renderTokenizedText(node, getRoleEffectSummary(role, card));
 }
 
 function setActionDescriptions() {
@@ -2005,17 +2130,19 @@ function setActionDescriptions() {
   const interestAmount = getInterestGoldGain(localSlot);
   const strikeAmount = getStrikeDamage(localSlot);
   if (ui.interestActionDesc) {
-    ui.interestActionDesc.textContent = "";
-    appendText(ui.interestActionDesc, `+${interestAmount} `);
-    const goldIcon = createInlineIcon("gold");
-    if (goldIcon) ui.interestActionDesc.appendChild(goldIcon);
+    renderTokenizedText(ui.interestActionDesc, `+${interestAmount} {GOLD}`);
   }
   if (ui.strikeActionDesc) {
-    ui.strikeActionDesc.textContent = "";
-    appendText(ui.strikeActionDesc, `Deal ${strikeAmount} `);
-    const swordIcon = createInlineIcon("sword");
-    if (swordIcon) ui.strikeActionDesc.appendChild(swordIcon);
-    appendText(ui.strikeActionDesc, " DMG");
+    renderTokenizedText(ui.strikeActionDesc, `Deal ${strikeAmount} {SWORD} DMG`);
+  }
+  if (ui.strikeCostPill) {
+    ui.strikeCostPill.replaceChildren();
+    const icon = GoldIcon({ className: "cost-icon", size: ICON_DEFAULT_SIZES.badge });
+    if (icon) ui.strikeCostPill.appendChild(icon);
+    const value = document.createElement("span");
+    value.className = "cost-value";
+    value.textContent = String(BASIC_ACTIONS.STRIKE.cost);
+    ui.strikeCostPill.appendChild(value);
   }
 }
 
@@ -2034,14 +2161,13 @@ function renderAvatarChoices() {
     choice.setAttribute("aria-disabled", unlocked ? "false" : "true");
     renderAvatar(artNode, avatarId);
     if (labelNode) labelNode.textContent = getAvatarMeta(avatarId).displayName;
-    if (descNode) descNode.textContent = getAvatarMeta(avatarId).shortDescription;
+    if (descNode) renderTokenizedText(descNode, getAvatarMeta(avatarId).shortDescription);
   });
 }
 
 function applyAssetCssVariables() {
   if (!document || !document.documentElement) return;
   document.documentElement.style.setProperty("--badge-image", `url("${withAssetVersion(ASSET_MAP.badgePath)}")`);
-  document.documentElement.style.setProperty("--cost-icon-image", `url("${withAssetVersion(ASSET_MAP.iconPaths.gold)}")`);
 }
 
 function createStatSegment(iconKey, text) {
@@ -2050,7 +2176,7 @@ function createStatSegment(iconKey, text) {
   const normalizedIconKey = String(iconKey || "").toLowerCase().trim();
   if (normalizedIconKey) segment.classList.add(`stat-segment-${normalizedIconKey}`);
   if (String(text).toLowerCase() === "shield") segment.classList.add("stat-segment-shield");
-  const icon = createInlineIcon(iconKey, "stat-icon");
+  const icon = createIconByKey(iconKey, { className: "stat-icon", size: ICON_DEFAULT_SIZES.stat });
   if (icon) segment.appendChild(icon);
   const value = document.createElement("span");
   value.className = "stat-value";
@@ -2409,6 +2535,11 @@ function renderHomeTipDots() {
   });
 }
 
+function renderRulesSummaryText() {
+  if (!ui.rulesText) return;
+  renderTokenizedText(ui.rulesText, RULES_SUMMARY_COPY);
+}
+
 function renderRulesRoleList() {
   if (!ui.rulesRoleList) return;
   ui.rulesRoleList.innerHTML = "";
@@ -2425,7 +2556,8 @@ function renderRulesRoleList() {
 
     const text = document.createElement("p");
     text.className = "rules-role-text";
-    text.textContent = `${entry.label || getRoleDisplayName(entry.role)} - ${entry.text}`;
+    appendText(text, `${entry.label || getRoleDisplayName(entry.role)} - `);
+    appendTokenizedText(text, entry.text);
 
     row.appendChild(thumb);
     row.appendChild(text);
@@ -2677,7 +2809,7 @@ function getRoleCost(role, card) {
 function getRoleEffectSummary(role, card) {
   if (role === "APPRENTICE") {
     const dmg = clamp(typeof card?.apprenticeDamage === "number" ? card.apprenticeDamage : 1, 1, 5);
-    return `${dmg} ⚔ · ↑ each round`;
+    return `${dmg} {SWORD} · {UP} each round`;
   }
   const meta = getRoleMeta(role);
   return meta ? String(meta.description || "") : "";
@@ -5656,7 +5788,7 @@ function openGameEventTooltip() {
   const eventMeta = getGameEventMeta(state.gameEventId);
   state.gameEventTooltip.open = true;
   if (ui.gameEventTooltipTitle) ui.gameEventTooltipTitle.textContent = eventMeta.name;
-  if (ui.gameEventTooltipText) ui.gameEventTooltipText.textContent = eventMeta.description;
+  if (ui.gameEventTooltipText) renderTokenizedText(ui.gameEventTooltipText, eventMeta.description);
   if (ui.gameEventTooltipOverlay) ui.gameEventTooltipOverlay.classList.remove("hidden");
 }
 
@@ -5677,7 +5809,7 @@ function syncGameEventTooltip() {
   }
   const eventMeta = getGameEventMeta(state.gameEventId);
   if (ui.gameEventTooltipTitle) ui.gameEventTooltipTitle.textContent = eventMeta.name;
-  if (ui.gameEventTooltipText) ui.gameEventTooltipText.textContent = eventMeta.description;
+  if (ui.gameEventTooltipText) renderTokenizedText(ui.gameEventTooltipText, eventMeta.description);
   ui.gameEventTooltipOverlay.classList.remove("hidden");
 }
 
@@ -5688,7 +5820,7 @@ function openHeroTooltip(slot) {
   state.heroTooltip.slot = resolvedSlot;
   state.heroTooltip.open = true;
   if (ui.heroTooltipTitle) ui.heroTooltipTitle.textContent = hero.displayName;
-  if (ui.heroTooltipText) ui.heroTooltipText.textContent = hero.shortDescription;
+  if (ui.heroTooltipText) renderTokenizedText(ui.heroTooltipText, hero.shortDescription);
   if (ui.heroTooltipOverlay) ui.heroTooltipOverlay.classList.remove("hidden");
 }
 
@@ -5710,7 +5842,7 @@ function syncHeroTooltip() {
   const slot = state.heroTooltip.slot === "bot" ? "bot" : "human";
   const hero = getHeroMeta(getHeroIdForSlot(slot));
   if (ui.heroTooltipTitle) ui.heroTooltipTitle.textContent = hero.displayName;
-  if (ui.heroTooltipText) ui.heroTooltipText.textContent = hero.shortDescription;
+  if (ui.heroTooltipText) renderTokenizedText(ui.heroTooltipText, hero.shortDescription);
   ui.heroTooltipOverlay.classList.remove("hidden");
 }
 
@@ -5816,9 +5948,7 @@ function createRoleCardNode({ ownerSlot, card, cardIndex, asButton, disabled }) 
   }
 
   if (!hideOpponentCardDetails && meta && !meta.passive && roleCost > 0) {
-    const cost = document.createElement("span");
-    cost.className = "card-badge card-cost";
-    cost.textContent = String(roleCost);
+    const cost = createGoldCostBadge(roleCost, "card-badge card-cost");
     badgeRight.appendChild(cost);
     hasBadge = true;
   }
@@ -6142,7 +6272,7 @@ function renderCollectionList() {
 
     const desc = document.createElement("p");
     desc.className = "collection-item-desc";
-    desc.textContent = item.description;
+    renderTokenizedText(desc, item.description);
     textWrap.appendChild(desc);
 
     const status = document.createElement("p");
@@ -6152,11 +6282,9 @@ function renderCollectionList() {
 
     row.appendChild(textWrap);
     if (tab === "cards") {
-      const cost = document.createElement("span");
       const rawCost = Number(item.cost);
       if (!item.passive && Number.isFinite(rawCost) && rawCost > 0) {
-        cost.className = "card-badge card-cost collection-card-cost";
-        cost.textContent = String(rawCost);
+        const cost = createGoldCostBadge(rawCost, "card-badge card-cost collection-card-cost");
         row.appendChild(cost);
       }
     }
@@ -6702,10 +6830,10 @@ function updateUI() {
   if (ui.resultOpponentName) ui.resultOpponentName.textContent = slotName(opponentSlot);
   if (ui.resultLocalStatsLabel) ui.resultLocalStatsLabel.textContent = slotName(localSlot);
   if (ui.resultOpponentStatsLabel) ui.resultOpponentStatsLabel.textContent = slotName(opponentSlot);
-  if (ui.resultLocalHpText) ui.resultLocalHpText.textContent = `HP: ${localPlayer.hp}`;
-  if (ui.resultOpponentHpText) ui.resultOpponentHpText.textContent = `HP: ${opponentPlayer.hp}`;
-  if (ui.resultLocalGoldText) ui.resultLocalGoldText.textContent = `Gold: ${localPlayer.gold}`;
-  if (ui.resultOpponentGoldText) ui.resultOpponentGoldText.textContent = `Gold: ${opponentPlayer.gold}`;
+  if (ui.resultLocalHpText) renderTokenizedText(ui.resultLocalHpText, `{HEART} ${localPlayer.hp}`, { iconClassName: "result-inline-icon", iconSize: 14 });
+  if (ui.resultOpponentHpText) renderTokenizedText(ui.resultOpponentHpText, `{HEART} ${opponentPlayer.hp}`, { iconClassName: "result-inline-icon", iconSize: 14 });
+  if (ui.resultLocalGoldText) renderTokenizedText(ui.resultLocalGoldText, `{GOLD} ${localPlayer.gold}`, { iconClassName: "result-inline-icon", iconSize: 14 });
+  if (ui.resultOpponentGoldText) renderTokenizedText(ui.resultOpponentGoldText, `{GOLD} ${opponentPlayer.gold}`, { iconClassName: "result-inline-icon", iconSize: 14 });
   if (ui.resultLocalRankText) ui.resultLocalRankText.innerHTML = formatRankingLine(localSlot);
   if (ui.resultOpponentRankText) ui.resultOpponentRankText.innerHTML = formatRankingLine(opponentSlot);
   if (ui.resultLocalCard) ui.resultLocalCard.classList.toggle("is-winner", state.matchWinner === localSlot);
@@ -7059,28 +7187,28 @@ function renderFirstMatchGuideOverlay() {
   const guide = state.firstMatchGuide || createFirstMatchGuideState();
   if (guide.overlayMode === "nice") {
     ui.firstMatchGuideTitle.textContent = FIRST_MATCH_NICE_OVERLAY.title;
-    ui.firstMatchGuideBody.textContent = FIRST_MATCH_NICE_OVERLAY.body;
+    renderTokenizedText(ui.firstMatchGuideBody, FIRST_MATCH_NICE_OVERLAY.body);
     ui.firstMatchGuideNextBtn.textContent = FIRST_MATCH_NICE_OVERLAY.button;
     applyGuideSpotlights([]);
     return;
   }
   if (guide.overlayMode === "decision") {
     ui.firstMatchGuideTitle.textContent = FIRST_MATCH_DECISION_OVERLAY.title;
-    ui.firstMatchGuideBody.textContent = FIRST_MATCH_DECISION_OVERLAY.body;
+    renderTokenizedText(ui.firstMatchGuideBody, FIRST_MATCH_DECISION_OVERLAY.body);
     ui.firstMatchGuideNextBtn.textContent = FIRST_MATCH_DECISION_OVERLAY.button;
     applyGuideSpotlights(["#acceptBtn", "#challengeBtn"]);
     return;
   }
   if (guide.overlayMode === "final") {
     ui.firstMatchGuideTitle.textContent = FIRST_MATCH_FINAL_OVERLAY.title;
-    ui.firstMatchGuideBody.textContent = FIRST_MATCH_FINAL_OVERLAY.body;
+    renderTokenizedText(ui.firstMatchGuideBody, FIRST_MATCH_FINAL_OVERLAY.body);
     ui.firstMatchGuideNextBtn.textContent = FIRST_MATCH_FINAL_OVERLAY.button;
     applyGuideSpotlights([]);
     return;
   }
   const step = FIRST_MATCH_GUIDE_STEPS[clamp(Number(guide.stepIndex) || 0, 0, FIRST_MATCH_GUIDE_STEPS.length - 1)];
   ui.firstMatchGuideTitle.textContent = step.title;
-  ui.firstMatchGuideBody.textContent = step.body;
+  renderTokenizedText(ui.firstMatchGuideBody, step.body);
   ui.firstMatchGuideNextBtn.textContent = step.button;
   applyGuideSpotlights(getFirstMatchGuideSpotlightSelectors(step));
 }
@@ -7274,7 +7402,7 @@ function renderTutorialStep() {
   uiRuntime.tutorialStepIndex = clampedIndex;
   const step = steps[clampedIndex];
 
-  if (ui.tutorialStepText) ui.tutorialStepText.textContent = step.text;
+  if (ui.tutorialStepText) renderTokenizedText(ui.tutorialStepText, step.text);
   if (ui.tutorialNextBtn) ui.tutorialNextBtn.textContent = step.button;
   ui.tutorialModal.dataset.step = step.focus || "none";
 }
@@ -7993,6 +8121,7 @@ function cacheElements() {
   ui.strikeBtn = document.getElementById("strikeBtn");
   ui.interestActionDesc = document.getElementById("interestActionDesc");
   ui.strikeActionDesc = document.getElementById("strikeActionDesc");
+  ui.strikeCostPill = document.getElementById("strikeCostPill");
 
   ui.responseOverlay = document.getElementById("responseOverlay");
   ui.acceptBtn = document.getElementById("acceptBtn");
@@ -8068,6 +8197,7 @@ function cacheElements() {
 
   ui.rulesModal = document.getElementById("rulesModal");
   ui.rulesCloseBtn = document.getElementById("rulesCloseBtn");
+  ui.rulesText = document.getElementById("rulesText");
   ui.rulesRoleList = document.getElementById("rulesRoleList");
   ui.premiumModal = document.getElementById("premiumModal");
   ui.premiumCloseBtn = document.getElementById("premiumCloseBtn");
@@ -8168,6 +8298,7 @@ async function init() {
   state.matchHistory = loadMatchHistoryFromStorage();
   applyAssetCssVariables();
   renderAvatarChoices();
+  renderRulesSummaryText();
   renderRulesRoleList();
   renderTutorialCards();
   renderHomeTipDots();

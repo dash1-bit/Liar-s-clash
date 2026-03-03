@@ -497,10 +497,11 @@ body {
 }
 
 .inline-icon {
-  width: clamp(10px, 2.8vw, 13px);
-  height: clamp(10px, 2.8vw, 13px);
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
   object-fit: contain;
-  vertical-align: -1px;
+  vertical-align: -2px;
 }
 
 .home-card,
@@ -1658,6 +1659,9 @@ body {
 
 .card-desc-up-arrow {
   color: #81b64c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .card-badge-row {
@@ -1699,17 +1703,36 @@ body {
 .card-cost {
   border: 0;
   background-color: transparent;
-  background-image: var(--cost-icon-image);
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
+  border-radius: 999px;
   color: #000;
   min-width: 24px;
   min-height: 24px;
-  display: grid;
+  display: inline-grid;
   place-items: center;
-  padding: 1px 4px;
+  padding: 0;
+  position: relative;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  text-shadow: none;
+}
+
+.card-cost .cost-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.card-cost .cost-value {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  font-weight: 900;
+  color: #000;
 }
 
 .card-passive {
@@ -1856,21 +1879,38 @@ body {
   right: 5px;
   border: 0;
   border-radius: 999px;
-  padding: 2px 6px;
+  padding: 0;
   font-size: var(--fs-xs);
   line-height: 1;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  color: #000;
+  text-shadow: none;
   background-color: transparent;
-  background-image: var(--cost-icon-image);
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
-  min-width: 22px;
-  min-height: 22px;
+  min-width: 24px;
+  min-height: 24px;
   display: grid;
   place-items: center;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  overflow: visible;
+}
+
+.cost-pill .cost-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cost-pill .cost-value {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  font-weight: 900;
+  color: #000;
 }
 
 .strike-cost-pill {
@@ -2614,11 +2654,25 @@ body {
   font-size: var(--fs-xs);
   color: #dededb;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .result-stats-card--right .result-stats-label,
 .result-stats-card--right .result-stats-line {
   text-align: right;
+}
+
+.result-stats-card--right .result-stats-line {
+  justify-content: flex-end;
+}
+
+.result-inline-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 .rank-delta {
